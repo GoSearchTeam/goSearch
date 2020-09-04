@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/collinglass/bptree"
+	"goSearch/tree"
 	"strings"
 )
 
 type indexTree struct {
 	name string
-	tree *bptree.Tree
+	tree *tree.Tree
 	len  int64
 }
 
@@ -35,8 +35,8 @@ type Forest struct {
 // Jungle - A Forest is kind of like an app, or collection of indexes
 type Jungle []Forest
 
-func initTree(forest *Forest, name string) (tree *indexTree) {
-	newTree := indexTree{name, bptree.NewTree(), 0}
+func initTree(forest *Forest, name string) *indexTree {
+	newTree := indexTree{name, tree.NewTree(), 0}
 	forest.trees = append(forest.trees, newTree)
 	return &newTree
 }
