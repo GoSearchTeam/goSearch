@@ -21,3 +21,5 @@ _see more performance metrics here: https://github.com/MauriceGit/skiplist_
 This is the major advantage that skip lists present, as a significantly large majority of operations will be search, as opposed to data modification operations.
 
 By sacrificing some time on the speed of modification, we by far make that time up in search performance.
+
+We run an _unlocked_ skip list, meaning that CRUD operations can happen async. (in parallel). This increases speed while presenting no downsides for our use case.
