@@ -23,4 +23,11 @@ There is a clear slowdown when it comes to modifying the data in the tree, but b
 
 With this performance, we can recognize for about `170 thousand` searches per second.
 
+Comparing that to a b+tree written in Node.JS, we see the speed advantages of Go as well:
+
+![speed comparison](/assets/unknown-1.png)
+_Fig. 2 - b+tree in Node.JS (100 million records)_
+
+At `141 microseconds`, golang is about 23x faster than Node.JS, not even counting that it is more memory efficient as well.
+
 We run an _unlocked_ tree, meaning that CRUD operations can happen async. (in parallel). This increases speed while presenting no downsides for our use case.
