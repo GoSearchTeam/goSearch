@@ -15,7 +15,7 @@ type indexTree struct {
 func (tree indexTree) addTreeIndex(k interface{}, v interface{}) {
 	value := fmt.Sprintf("%v", v)
 	fmt.Println("### Adding tree index...")
-	// TODO: Break up string into individual words if string
+	// Break up string into individual words (if string)
 	fmt.Println("### Splitting:", value)
 	split := strings.Fields(value)
 	fmt.Printf("### Split value: %q\n", split)
