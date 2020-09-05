@@ -2,73 +2,112 @@ package main
 
 import (
 	"fmt"
-	"goSearch/tree"
+	"github.com/segmentio/ksuid"
 	"strings"
 )
 
-type indexTree struct {
-	name string
-	tree *tree.Tree
-	len  int64
+type indexMap struct {
+	field string
+	index map[string][]string
 }
 
-func (tree indexTree) addTreeIndex(k interface{}, v interface{}) {
-	value := fmt.Sprintf("%v", v)
-	fmt.Println("### Adding tree index...")
-	// Break up string into individual words (if string)
-	fmt.Println("### Splitting:", value)
-	split := strings.Fields(value)
-	fmt.Printf("### Split value: %q\n", split)
-	for _, item := range split {
-		key := stringToNum(item)
-		fmt.Println("### Key: ", key)
-		tree.tree.Insert(key, []byte(item))
-		tree.len++
+type appIndexes struct {
+	indexes []indexMap
+	name    string
+}
+
+func initApp(name string) *appIndexes {
+	appindex := appIndexes{make([]indexMap, 0), name}
+	return &appindex
+}
+
+func initIndexMap(indexmap *indexMap, name string) *indexMap {
+	newMap := indexMap{name, make(map[string][]string)}
+	return &newMap
+}
+
+func tokenizeString(input string) []string {
+	return strings.Fields(input)
+}
+
+func lowercaseTokens(tokens []string) []string {
+	output := make([]string, len(tokens))
+	for i, token := range tokens {
+		output[i] = strings.ToLower(token)
 	}
+	return output
 }
 
-type Forest struct {
-	trees []indexTree
-	name  string
+// ########################################################################
+// ######################## appIndexes functions ##########################
+// ########################################################################
+
+func (appindex *appIndexes) addIndexMap(name string) *indexMap {
+	newIndexMap := indexMap{name, make(map[string][]string)}
+	appindex.indexes = append(appindex.indexes, newIndexMap)
+	return &newIndexMap
 }
 
-// Jungle - A Forest is kind of like an app, or collection of indexes
-type Jungle []Forest
-
-func initTree(forest *Forest, name string) *indexTree {
-	newTree := indexTree{name, tree.NewTree(), 0}
-	forest.trees = append(forest.trees, newTree)
-	return &newTree
-}
-
-// Create index from parsed json
-func addIndex(parsed map[string]interface{}, forest *Forest) {
+func (appindex *appIndexes) addIndex(parsed map[string]interface{}) {
 	fmt.Println("### Adding index...")
-	// TODO: Store document
-	// TODO: check if tree exists with name of every json key, if not create tree
-	// For all of the k,v pairs in the json
+	// Format the input
+	var id string = fmt.Sprintf("%v", parsed["id"])
+	if parsed["id"] == nil {
+		fmt.Println("### No id found")
+		id = ksuid.New().String()
+	}
+	fmt.Println("### ID:", id)
 	for k, v := range parsed {
-		var treePointer *indexTree = nil
-		for i := 0; i < len(forest.trees); i++ {
-			if k == forest.trees[i].name { // Found existing tree
-				fmt.Println("### Found existing tree!")
-				treePointer = &forest.trees[i]
+		// Don't index ID
+		if strings.ToLower(k) == "id" {
+			continue
+		}
+		// Find if indexMap already exists
+		var indexMapPointer *indexMap = nil
+		for i := 0; i < len(appindex.indexes); i++ {
+			if k == appindex.indexes[i].field {
+				indexMapPointer = &appindex.indexes[i]
 				break
 			}
 		}
 
-		if treePointer == nil { // Create tree
-			fmt.Println("### Creating new tree...")
-			treePointer = initTree(forest, k)
+		if indexMapPointer == nil { // Create indexMap
+			indexMapPointer = appindex.addIndexMap(k)
+			fmt.Println("### Creating new indexMap")
 		}
 
-		// Add index to forest
-		treePointer.addTreeIndex(k, v)
+		// Add index to indexMap
+		indexMapPointer.addIndex(id, fmt.Sprintf("%v", v))
 	}
+
+	// TODO: Store document
+	// TODO: check if tree exists with name of every json key, if not create tree
 
 }
 
-func saveTree(tree indexTree) (err error) {
+// ########################################################################
+// ######################### indexMap functions ###########################
+// ########################################################################
 
-	return nil
+func (indexmap *indexMap) addIndex(id string, value string) {
+	// Tokenize
+	for _, token := range lowercaseTokens(tokenizeString(value)) {
+		fmt.Println("### INDEXING:", token)
+		// Check if index already exists
+		if indexmap.index[token] != nil {
+			var found bool = false
+			for _, docID := range indexmap.index[token] {
+				fmt.Println("### Found token, Checking if doc exists...")
+				if docID == id {
+					fmt.Println("### Skip to avoid duplicates")
+					found = true
+					break
+				}
+			}
+			if found {
+				continue
+			}
+		}
+		indexmap.index[token] = append(indexmap.index[token], id)
+	}
 }
