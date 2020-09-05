@@ -48,15 +48,15 @@ func (appindex *appIndexes) addIndexMap(name string) *indexMap {
 	return &newIndexMap
 }
 
-func (appindex *appIndexes) addIndex(parsed map[string]interface{}) {
-	fmt.Println("### Adding index...")
+func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID string) {
+	// fmt.Println("### Adding index...")
 	// Format the input
 	var id string = fmt.Sprintf("%v", parsed["id"])
 	if parsed["id"] == nil {
-		fmt.Println("### No id found")
+		// fmt.Println("### No id found")
 		id = ksuid.New().String()
 	}
-	fmt.Println("### ID:", id)
+	// fmt.Println("### ID:", id)
 	for k, v := range parsed {
 		// Don't index ID
 		if strings.ToLower(k) == "id" {
@@ -73,12 +73,13 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) {
 
 		if indexMapPointer == nil { // Create indexMap
 			indexMapPointer = appindex.addIndexMap(k)
-			fmt.Println("### Creating new indexMap")
+			// fmt.Println("### Creating new indexMap")
 		}
 
 		// Add index to indexMap
 		indexMapPointer.addIndex(id, fmt.Sprintf("%v", v))
 	}
+	return id
 
 	// TODO: Store document
 	// TODO: check if tree exists with name of every json key, if not create tree
@@ -91,16 +92,17 @@ func (appindex *appIndexes) search(input string, fields []string) (documentIDs [
 	for _, token := range lowercaseTokens(tokenizeString(input)) {
 		// Check fields
 		if len(fields) == 0 { // check all
-			fmt.Println("### No fields given, searching all fields...")
+			// fmt.Println("### No fields given, searching all fields...")
 			for _, indexmap := range appindex.indexes {
-				fmt.Println("### Searching index:", indexmap.field, "for", token)
+				// fmt.Println("### Searching index:", indexmap.field, "for", token)
 				output = append(output, indexmap.search(token)...)
 			}
 		} else { // check given fields
 			for _, field := range fields {
+				// fmt.Println("### Searching index:", field, "for", token)
 				docIDs := appindex.searchByField(token, field)
 				if docIDs == nil {
-					fmt.Println("### Field doesn't exist:", field)
+					// fmt.Println("### Field doesn't exist:", field)
 					continue
 				}
 				output = append(output, docIDs...)
@@ -129,14 +131,14 @@ func (appindex *appIndexes) searchByField(input string, field string) (documentI
 func (indexmap *indexMap) addIndex(id string, value string) {
 	// Tokenize
 	for _, token := range lowercaseTokens(tokenizeString(value)) {
-		fmt.Println("### INDEXING:", token)
+		// fmt.Println("### INDEXING:", token)
 		// Check if index already exists
 		if indexmap.index[token] != nil {
 			var found bool = false
 			for _, docID := range indexmap.index[token] {
-				fmt.Println("### Found token, Checking if doc exists...")
+				// fmt.Println("### Found token, Checking if doc exists...")
 				if docID == id {
-					fmt.Println("### Skip to avoid duplicates")
+					// fmt.Println("### Skip to avoid duplicates")
 					found = true
 					break
 				}
