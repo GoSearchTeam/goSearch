@@ -85,6 +85,43 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) {
 
 }
 
+func (appindex *appIndexes) search(input string, fields []string) (documentIDs []string) {
+	var output []string
+	// Tokenize input
+	for _, token := range lowercaseTokens(tokenizeString(input)) {
+		// Check fields
+		if len(fields) == 0 { // check all
+			fmt.Println("### No fields given, searching all fields...")
+			for _, indexmap := range appindex.indexes {
+				fmt.Println("### Searching index:", indexmap.field, "for", token)
+				output = append(output, indexmap.search(token)...)
+			}
+		} else { // check given fields
+			for _, field := range fields {
+				docIDs := appindex.searchByField(token, field)
+				if docIDs == nil {
+					fmt.Println("### Field doesn't exist:", field)
+					continue
+				}
+				output = append(output, docIDs...)
+			}
+		}
+	}
+	return output
+}
+
+func (appindex *appIndexes) searchByField(input string, field string) (documentIDs []string) {
+	// Check if field exists
+	var output []string
+	for _, indexmap := range appindex.indexes {
+		if indexmap.field == field {
+			output = append(output, indexmap.search(input)...)
+			break
+		}
+	}
+	return output
+}
+
 // ########################################################################
 // ######################### indexMap functions ###########################
 // ########################################################################
@@ -110,4 +147,8 @@ func (indexmap *indexMap) addIndex(id string, value string) {
 		}
 		indexmap.index[token] = append(indexmap.index[token], id)
 	}
+}
+
+func (indexmap *indexMap) search(input string) (documentIDs []string) {
+	return indexmap.index[input]
 }
