@@ -38,9 +38,11 @@ Furthermore, with maps, we build a map for each field in the JSON object. This m
 Using `goroutines`, golang's version of threading, we observed the following performance metrics on identical data sets:
 
 ![concurrent goroutine search](/assets/unknown-5.png)
-_Fig. 4 - Map concurrent goroutine search_
+_Fig. 4 - Map concurrent goroutine search (100,000 records)_
 
 ![sync search](/assets/unknown-4.png)
-_Fig. 5 - Synchronous search_
+_Fig. 5 - Synchronous search (100,000 records)_
 
 This test, on a dataset with 10 fields (10 maps), resulted in significantly slower performance when using `goroutines`. Seemingly counter intuitive, but makes development easier as we don't have to deal with the complexity of concurrency. We suspect this is due to the concurrency running on only a single core, and thus wasting time switching between threads.
+
+_Also notice how similar the times of 100 million and 100,000 records are so similar? O(n) performance baby!_
