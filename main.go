@@ -84,11 +84,43 @@ func main() {
 	fmt.Println(search)
 	fmt.Println("### SEARCH DONE IN", end.Sub(start))
 
+	fmt.Println("### SEARCHING...")
+	start = time.Now()
+	search = app.search("cc500000", make([]string, 0))
+	end = time.Now()
+	fmt.Println(search)
+	fmt.Println("### SEARCH DONE IN", end.Sub(start))
+
+	fmt.Println("### SEARCHING...")
+	start = time.Now()
+	search = app.search("ee999900", make([]string, 0))
+	end = time.Now()
+	fmt.Println(search)
+	fmt.Println("### SEARCH DONE IN", end.Sub(start))
+
 	fmt.Println("### SPECIFIC SEARCH")
 	fields := make([]string, 1)
 	fields[0] = "example"
 	start = time.Now()
 	search = app.search("hey9000", fields)
+	end = time.Now()
+	fmt.Println(search)
+	fmt.Println("### SPECIFIC SEARCH DONE IN", end.Sub(start))
+
+	fmt.Println("### SPECIFIC SEARCH")
+	fields = make([]string, 1)
+	fields[0] = "cc"
+	start = time.Now()
+	search = app.search("cc500000", fields)
+	end = time.Now()
+	fmt.Println(search)
+	fmt.Println("### SPECIFIC SEARCH DONE IN", end.Sub(start))
+
+	fmt.Println("### SPECIFIC SEARCH")
+	fields = make([]string, 1)
+	fields[0] = "ee"
+	start = time.Now()
+	search = app.search("ee999900", fields)
 	end = time.Now()
 	fmt.Println(search)
 	fmt.Println("### SPECIFIC SEARCH DONE IN", end.Sub(start))
