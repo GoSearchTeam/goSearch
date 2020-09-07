@@ -46,3 +46,45 @@ _Fig. 5 - Synchronous search (100,000 records)_
 This test, on a dataset with 10 fields (10 maps), resulted in significantly slower performance when using `goroutines`. Seemingly counter intuitive, but makes development easier as we don't have to deal with the complexity of concurrency. We suspect this is due to the concurrency running on only a single core, and thus wasting time switching between threads.
 
 _Also notice how similar the times of 100 million and 100,000 records are so similar? O(n) performance baby!_
+
+**Just when we thought we had the solution, our scope invalidated it:**
+
+Not only are maps incredibly memory inefficient (so many duplicate characters and element), but we wanted to add features like prefix searching, suffix searching, and fuzzy searching. In order to do this, we leveraged the power of `radix trees`.
+
+`Radix trees` are an extension of `Tries`, which are string key prefix trees (see [trie](https://en.wikipedia.org/wiki/Trie) and [radix tree](https://en.wikipedia.org/wiki/Radix_tree)). This allows us to have a highly memory efficient data structure that allows us to perform prefix, suffix, and fuzzy searches based on string input.
+
+`Radix trees` are optimized versions of `Tries`, as proven in testing below:
+
+![trie test](/assets/unknown-8.png)
+_Fig. 6 - Trie test_
+
+![radix tree test](/assets/unknown-7.png)
+_Fig. 7 - Radix Tree test_
+
+Running the exact same tests, we can see that radix trees perform better in every category.
+
+This allows us to do the following searches:
+
+_PSUEDO CODE_
+```
+INSERT fire
+ok
+
+INSERT firebase
+ok
+
+INSERT firetruck
+ok
+
+FIND fire
+fire
+# in O(m) time, where m is the number of characters in the search
+
+PREFIX_SEARCH fire
+fire firetruck firebase
+# in O(p) time, where p is the number of children under the search term
+
+FUZZY_SEARCH ftuc
+firetruck
+# in O(p*m) time, where p and m are same as above
+```
