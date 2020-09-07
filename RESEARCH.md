@@ -78,13 +78,13 @@ ok
 
 FIND fire
 fire
-# in O(m) time, where m is the number of characters in the search
+# in max O(m) time, where m is the number of characters in the search
 
 PREFIX_SEARCH fire
 fire firetruck firebase
-# in O(p) time, where p is the number of children under the search term
+# in max O(p) time, where p is the number of children under the search term
 
 FUZZY_SEARCH ftuc
 firetruck
-# in O(p*m) time, where p and m are same as above
+# in max O(p*m) time, where p and m are same as above
 ```
