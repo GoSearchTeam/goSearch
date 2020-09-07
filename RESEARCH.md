@@ -65,7 +65,7 @@ Running the exact same tests, we can see that radix trees perform better in ever
 
 This allows us to do the following searches:
 
-_PSUEDO CODE_
+_PSUEDO CODE:_
 ```
 INSERT fire
 ok
