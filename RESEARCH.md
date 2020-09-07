@@ -82,7 +82,7 @@ fire
 
 PREFIX_SEARCH fire
 fire firetruck firebase
-# in max O(p) time, where p is the number of children under the search term
+# in max O(p+m) time, where p is the number of children under the search term
 
 FUZZY_SEARCH ftuc
 firetruck
