@@ -66,7 +66,6 @@ func main() {
 	// end = time.Now()
 	// fmt.Println(search)
 	// fmt.Println("### Many fields search done in", end.Sub(start))
-
 	fmt.Println("### BUILDING ENORMOUS DATA SET")
 	app = initApp("Big Set")
 	start = time.Now()
