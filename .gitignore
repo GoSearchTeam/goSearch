@@ -1,2 +1,3 @@
 goSearch
 moviedata.json
+*.tfstate*
