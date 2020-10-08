@@ -39,7 +39,7 @@ resource "digitalocean_loadbalancer" "loadb" {
 }
 
 resource "digitalocean_project" "tutorials" {
-  name        = "testprjc"
+  name        = "testprjca"
   resources   = flatten([digitalocean_droplet.drop.*.urn, digitalocean_loadbalancer.loadb.urn])
 }
 
