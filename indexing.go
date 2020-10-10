@@ -23,6 +23,11 @@ type fuzzyItem struct {
 	value interface{}
 }
 
+type listItem struct {
+	IndexName   string
+	IndexValues []string
+}
+
 func initApp(name string) *appIndexes {
 	appindex := appIndexes{make([]indexMap, 0), name}
 	return &appindex
@@ -48,6 +53,21 @@ func lowercaseTokens(tokens []string) []string {
 // ########################################################################
 // ######################## appIndexes functions ##########################
 // ########################################################################
+
+func (appIndex *appIndexes) listIndexes() []listItem {
+	var output []listItem
+	for _, i := range appIndex.indexes {
+		newItem := listItem{i.field, make([]string, 0)}
+		i.index.Walk(func(k string, value interface{}) bool {
+			// v := value.(roaring.Bitmap)
+			fmt.Println(k)
+			newItem.IndexValues = append(newItem.IndexValues, k)
+			return false
+		})
+		output = append(output, newItem)
+	}
+	return output
+}
 
 func (appindex *appIndexes) addIndexMap(name string) *indexMap {
 	newIndexMap := indexMap{name, radix.New()}
