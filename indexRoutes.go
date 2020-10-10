@@ -6,11 +6,6 @@ import (
 	"io/ioutil"
 )
 
-type listResponseJSON struct {
-	indexName string   `json:indexName`
-	values    []string `json:indexValues`
-}
-
 func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 	r.GET("/index/listItems", func(c *gin.Context) {
 		list := app.listIndexItems()
