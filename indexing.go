@@ -54,7 +54,7 @@ func lowercaseTokens(tokens []string) []string {
 // ######################## appIndexes functions ##########################
 // ########################################################################
 
-func (appIndex *appIndexes) listIndexes() []listItem {
+func (appIndex *appIndexes) listIndexItems() []listItem {
 	var output []listItem
 	for _, i := range appIndex.indexes {
 		newItem := listItem{i.field, make([]string, 0)}
@@ -65,6 +65,14 @@ func (appIndex *appIndexes) listIndexes() []listItem {
 			return false
 		})
 		output = append(output, newItem)
+	}
+	return output
+}
+
+func (appIndex *appIndexes) listIndexes() []string {
+	var output []string
+	for _, i := range appIndex.indexes {
+		output = append(output, i.field)
 	}
 	return output
 }

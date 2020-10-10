@@ -12,13 +12,17 @@ type listResponseJSON struct {
 }
 
 func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
-	r.GET("/index/list", func(c *gin.Context) {
-		list := app.listIndexes()
-		fmt.Println(list)
+	r.GET("/index/listItems", func(c *gin.Context) {
+		list := app.listIndexItems()
 		// stringed := make([]string, 0)
 		// for _, i := range list {
 		// 	fmt.Println(i)
 		// }
+		c.JSON(200, list)
+	})
+
+	r.GET("/index/listIndexes", func(c *gin.Context) {
+		list := app.listIndexes()
 		c.JSON(200, list)
 	})
 
