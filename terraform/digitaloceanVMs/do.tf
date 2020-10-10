@@ -1,7 +1,7 @@
 variable "do_token" {}
 
 variable "droplet_count" {
-  default = 2
+  default = 3
 }
 
 provider "digitalocean" {
