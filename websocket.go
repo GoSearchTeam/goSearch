@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/websocket"
 	"net/http"
 	"strings"
+	"time"
 )
 
 var wsupgrader = websocket.Upgrader{
@@ -16,6 +17,11 @@ var wsupgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
+}
+
+type WebsocketResponse struct {
+	TimeNS int64  `json:"timeNS"`
+	Result string `json:"result"`
 }
 
 func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, app *appIndexes) {
@@ -30,17 +36,16 @@ func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, app *appIndexes)
 		if err != nil {
 			break
 		}
+		start := time.Now()
 		flatJSON, _ := parseArbJSON(string(msg))
 		var body QueryBody
 		var output []uint32
 		if flatJSON["query"] != nil {
-			fmt.Println("Beginning search...")
 			json.Unmarshal(msg, &body)
 			query := body.Query
 			fields := body.Fields
 			if fields != nil { // Field(s) specified
 				for _, i := range fields {
-					fmt.Println(i)
 					res := app.searchByField(query, i)
 					output = append(output, res...)
 				}
@@ -48,14 +53,19 @@ func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, app *appIndexes)
 				res := app.search(query, make([]string, 0))
 				output = append(output, res...)
 			}
-			fmt.Println(output)
 			// Convert to array of strings
 			out2 := make([]string, len(output))
 			for _, item := range output {
 				out2 = append(out2, fmt.Sprintf("%v", item))
 			}
 			out3 := strings.Trim(strings.Join(strings.Fields(fmt.Sprint(output)), ","), "[]")
-			conn.WriteMessage(t, []byte(out3))
+			end := time.Now()
+			resStruct := &WebsocketResponse{
+				Result: out3,
+				TimeNS: end.Sub(start).Nanoseconds(),
+			}
+			resBody, _ := json.Marshal(resStruct)
+			conn.WriteMessage(t, []byte(resBody))
 		} else {
 			conn.WriteMessage(t, msg)
 		}
