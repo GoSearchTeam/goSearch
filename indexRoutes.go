@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 )
 
-type queryBody struct {
+type QueryBody struct {
 	Query  string   `json:query`
 	Fields []string `json:fields`
 }
@@ -29,7 +29,7 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 	r.POST("/index/search", func(c *gin.Context) {
 		// data, _ := ioutil.ReadAll(c.Request.Body)
 		// jDat, _ := parseArbJSON(string(data))
-		var body queryBody
+		var body QueryBody
 		c.BindJSON(&body)
 		fmt.Println(body)
 		var output []uint32 // temporary, will turn into documents later

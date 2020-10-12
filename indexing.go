@@ -4,8 +4,12 @@ import (
 	"fmt"
 	"github.com/RoaringBitmap/roaring"
 	"github.com/armon/go-radix"
+	"io/ioutil"
 	"math/rand"
+	"os"
+	"path/filepath"
 	"strings"
+	"time"
 )
 
 type indexMap struct {
@@ -48,6 +52,35 @@ func lowercaseTokens(tokens []string) []string {
 		output[i] = strings.ToLower(token)
 	}
 	return output
+}
+
+func CheckDocumentsFolder() {
+	if _, err := os.Stat("./documents"); os.IsNotExist(err) {
+		os.Mkdir("./documents", os.ModePerm)
+	}
+}
+
+func LoadIndexesFromDisk(app *appIndexes) {
+	// TODO: Change to load in serialized
+	files := make([]string, 0)
+	start := time.Now()
+	filepath.Walk("./documents", func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+		files = append(files, path)
+		// Load document into index
+		dat, err := ioutil.ReadFile(path)
+		if err != nil {
+			fmt.Println(err)
+			return err
+		}
+		doc, _ := parseArbJSON(string(dat))
+		app.addIndex(doc)
+		return nil
+	})
+	end := time.Now()
+	fmt.Printf("### Loaded %d file(s) in %v ###\n", len(files), end.Sub(start))
 }
 
 // ########################################################################
@@ -110,6 +143,10 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 		// Add index to indexMap
 		indexMapPointer.addIndex(id, fmt.Sprintf("%v", v))
 	}
+	// Write indexes document to disk
+	fmt.Sprintf("Writing out to: %s\n", fmt.Sprintf("./documents/%v", id))
+	sendback, _ := stringIndex(parsed)
+	ioutil.WriteFile(fmt.Sprintf("./documents/%v", id), []byte(sendback), os.ModePerm)
 	return id
 
 	// TODO: Store document
@@ -183,6 +220,7 @@ func FuzzySearch(key string, t *radix.Tree) []fuzzyItem {
 // ########################################################################
 
 func (indexmap *indexMap) addIndex(id uint32, value string) {
+	CheckDocumentsFolder()
 	// Tokenize
 	for _, token := range lowercaseTokens(tokenizeString(value)) {
 		// fmt.Println("### INDEXING:", token)

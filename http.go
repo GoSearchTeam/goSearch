@@ -5,10 +5,10 @@ import (
 	// "net/http"
 )
 
-func StartWebserver() {
+func StartWebserver(app *appIndexes) {
 	r := gin.Default()
-	app := initApp("Example App")
 	HandleTestRoutes(r)
 	HandleIndexRoutes(r, app)
+	HandleWebsocketRoutes(r, app)
 	r.Run("localhost:8080")
 }

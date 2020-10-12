@@ -3,5 +3,8 @@ package main
 import ()
 
 func main() {
-	StartWebserver()
+	app := initApp("Example App")
+	CheckDocumentsFolder()
+	LoadIndexesFromDisk(app)
+	StartWebserver(app)
 }
