@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/RoaringBitmap/roaring"
+	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/armon/go-radix"
 	"io/ioutil"
 	"math/rand"
@@ -92,7 +92,7 @@ func (appIndex *appIndexes) listIndexItems() []listItem {
 	for _, i := range appIndex.indexes {
 		newItem := listItem{i.field, make([]string, 0)}
 		i.index.Walk(func(k string, value interface{}) bool {
-			// v := value.(roaring.Bitmap)
+			// v := value.(roaring64.Bitmap)
 			fmt.Println(k)
 			newItem.IndexValues = append(newItem.IndexValues, k)
 			return false
@@ -116,10 +116,10 @@ func (appindex *appIndexes) addIndexMap(name string) *indexMap {
 	return &newIndexMap
 }
 
-func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID uint32) {
+func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID uint64) {
 	// fmt.Println("### Adding index...")
 	// Format the input
-	id := rand.Uint32()
+	id := rand.Uint64()
 	// fmt.Println("### ID:", id)
 	for k, v := range parsed {
 		// Don't index ID
@@ -154,8 +154,8 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 
 }
 
-func (appindex *appIndexes) search(input string, fields []string) (documentIDs []uint32) {
-	var output []uint32
+func (appindex *appIndexes) search(input string, fields []string) (documentIDs []uint64) {
+	var output []uint64
 	// Tokenize input
 	for _, token := range lowercaseTokens(tokenizeString(input)) {
 		// Check fields
@@ -180,9 +180,9 @@ func (appindex *appIndexes) search(input string, fields []string) (documentIDs [
 	return output
 }
 
-func (appindex *appIndexes) searchByField(input string, field string) (documentIDs []uint32) {
+func (appindex *appIndexes) searchByField(input string, field string) (documentIDs []uint64) {
 	// Check if field exists
-	var output []uint32
+	var output []uint64
 	for _, indexmap := range appindex.indexes {
 		if indexmap.field == field {
 			output = append(output, indexmap.search(input)...)
@@ -219,24 +219,24 @@ func FuzzySearch(key string, t *radix.Tree) []fuzzyItem {
 // ######################### indexMap functions ###########################
 // ########################################################################
 
-func (indexmap *indexMap) addIndex(id uint32, value string) {
+func (indexmap *indexMap) addIndex(id uint64, value string) {
 	CheckDocumentsFolder()
 	// Tokenize
 	for _, token := range lowercaseTokens(tokenizeString(value)) {
 		// fmt.Println("### INDEXING:", token)
 		// Check if index already exists
 		prenode, _ := indexmap.index.Get(token)
-		var ids *roaring.Bitmap
+		var ids *roaring64.Bitmap
 		if prenode == nil { // create new node
-			ids = roaring.BitmapOf(id)
+			ids = roaring64.BitmapOf(id)
 			_, updated := indexmap.index.Insert(token, ids)
 			if updated {
 				fmt.Errorf("### SOMEHOW UPDATED WHEN INSERTING NEW ###\n")
 			}
 			// fmt.Printf("### ADDED %v WITH IDS: %v ###\n", token, ids)
 		} else { // update node
-			node := prenode.(*roaring.Bitmap)
-			newid := rand.Uint32()
+			node := prenode.(*roaring64.Bitmap)
+			newid := rand.Uint64()
 			node.Add(newid)
 			ids = node
 			_, updated := indexmap.index.Insert(token, ids)
@@ -263,13 +263,14 @@ func (indexmap *indexMap) addIndex(id uint32, value string) {
 	}
 }
 
-func (indexmap *indexMap) search(input string) (documentIDs []uint32) {
-	var output []uint32
+func (indexmap *indexMap) search(input string) (documentIDs []uint64) {
+	var output []uint64
 	search, _ := indexmap.index.Get(input)
+	fmt.Println("Searching for", input, "in", indexmap.field)
 	if search == nil {
 		return output
 	}
-	node := search.(*roaring.Bitmap)
+	node := search.(*roaring64.Bitmap)
 	output = append(output, node.ToArray()...)
 	return output
 }

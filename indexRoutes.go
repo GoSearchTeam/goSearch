@@ -31,21 +31,19 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 		// jDat, _ := parseArbJSON(string(data))
 		var body QueryBody
 		c.BindJSON(&body)
-		fmt.Println(body)
-		var output []uint32 // temporary, will turn into documents later
+		var output []uint64 // temporary, will turn into documents later
 		// query := jDat["query"].(string)
 		query := body.Query
 		fields := body.Fields
 		if fields != nil { // Field(s) specified
-			for _, i := range fields {
-				fmt.Println(i)
-				res := app.searchByField(query, i)
-				output = append(output, res...)
-			}
+			fmt.Println("FIELD SEARCH")
+			res := app.search(query, fields)
+			output = append(output, res...)
 		} else {
 			res := app.search(query, make([]string, 0))
 			output = append(output, res...)
 		}
+		fmt.Println(output)
 		c.JSON(200, output)
 	})
 

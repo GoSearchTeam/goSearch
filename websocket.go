@@ -39,7 +39,7 @@ func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, app *appIndexes)
 		start := time.Now()
 		flatJSON, _ := parseArbJSON(string(msg))
 		var body QueryBody
-		var output []uint32
+		var output []uint64
 		if flatJSON["query"] != nil {
 			json.Unmarshal(msg, &body)
 			query := body.Query
