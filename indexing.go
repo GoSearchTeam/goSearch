@@ -266,7 +266,6 @@ func (indexmap *indexMap) addIndex(id uint64, value string) {
 func (indexmap *indexMap) search(input string) (documentIDs []uint64) {
 	var output []uint64
 	search, _ := indexmap.index.Get(input)
-	fmt.Println("Searching for", input, "in", indexmap.field)
 	if search == nil {
 		return output
 	}
