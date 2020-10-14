@@ -1,10 +1,10 @@
 package main
 
-import (
-	"fmt"
-)
+import ()
 
 func main() {
-	fmt.Println("Hello world")
-	me()
+	app := initApp("Example App")
+	CheckDocumentsFolder()
+	LoadIndexesFromDisk(app)
+	StartWebserver(app)
 }
