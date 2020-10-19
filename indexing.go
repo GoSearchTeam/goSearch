@@ -119,7 +119,9 @@ func (appindex *appIndexes) addIndexMap(name string) *indexMap {
 func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID uint64) {
 	// fmt.Println("### Adding index...")
 	// Format the input
+	rand.Seed(time.Now().UnixNano())
 	id := rand.Uint64()
+	fmt.Println(id)
 	// fmt.Println("### ID:", id)
 	for k, v := range parsed {
 		// Don't index ID
@@ -270,6 +272,9 @@ func (indexmap *indexMap) search(input string) (documentIDs []uint64) {
 		return output
 	}
 	node := search.(*roaring64.Bitmap)
+	fmt.Println(node)
+	fmt.Println(node.ToArray())
+	fmt.Println(node.String())
 	output = append(output, node.ToArray()...)
 	return output
 }
