@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"strconv"
 )
 
 type indexMap struct {
@@ -76,7 +77,11 @@ func LoadIndexesFromDisk(app *appIndexes) {
 			return err
 		}
 		doc, _ := parseArbJSON(string(dat))
-		app.addIndex(doc)
+		filename := strings.Split(path, "\\")[1];
+		fmt.Println(doc);
+		fmt.Println(filename);
+		// New fucntion, specifically for loading from disk without weird duplicates
+		app.addIndexFromDisk(doc, filename);
 		return nil
 	})
 	end := time.Now()
@@ -114,6 +119,46 @@ func (appindex *appIndexes) addIndexMap(name string) *indexMap {
 	newIndexMap := indexMap{name, radix.New()}
 	appindex.indexes = append(appindex.indexes, newIndexMap)
 	return &newIndexMap
+}
+
+func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, filename string) (documentID uint64) {
+	// fmt.Println("### Adding index...")
+	// Format the input
+	rand.Seed(time.Now().UnixNano())
+	id, _ := strconv.ParseUint(filename, 10, 64);
+	fmt.Println(id)
+	// fmt.Println("### ID:", id)
+	for k, v := range parsed {
+		// Don't index ID
+		if strings.ToLower(k) == "id" {
+			continue
+		}
+		// Find if indexMap already exists
+		var indexMapPointer *indexMap = nil
+		for i := 0; i < len(appindex.indexes); i++ {
+			if k == appindex.indexes[i].field {
+				indexMapPointer = &appindex.indexes[i]
+				break
+			}
+		}
+
+		if indexMapPointer == nil { // Create indexMap
+			indexMapPointer = appindex.addIndexMap(k)
+			// fmt.Println("### Creating new indexMap")
+		}
+
+		// Add index to indexMap
+		indexMapPointer.addIndex(id, fmt.Sprintf("%v", v))
+	}
+	// Write indexes document to disk
+	fmt.Sprintf("Writing out to: %s\n", fmt.Sprintf("./documents/%v", id))
+	sendback, _ := stringIndex(parsed)
+	ioutil.WriteFile(fmt.Sprintf("./documents/%v", id), []byte(sendback), os.ModePerm)
+	return id
+
+	// TODO: Store document
+	// TODO: check if tree exists with name of every json key, if not create tree
+
 }
 
 func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID uint64) {
