@@ -77,7 +77,8 @@ func LoadIndexesFromDisk(app *appIndexes) {
 			return err
 		}
 		doc, _ := parseArbJSON(string(dat))
-		filename := strings.Split(path, "\\")[1];
+		filename := filepath.Base(path);
+		//filename := strings.Split(path, "\\")[1];
 		fmt.Println(doc);
 		fmt.Println(filename);
 		// New fucntion, specifically for loading from disk without weird duplicates
