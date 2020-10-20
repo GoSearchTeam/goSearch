@@ -56,6 +56,7 @@ func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, app *appIndexes)
 			// Convert to array of strings
 			out2 := make([]string, len(output))
 			for _, item := range output {
+				//fmt.Sprintf("%d", item);
 				out2 = append(out2, fmt.Sprintf("%v", item))
 			}
 			out3 := strings.Trim(strings.Join(strings.Fields(fmt.Sprint(output)), ","), "[]")
