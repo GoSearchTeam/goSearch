@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"io/ioutil"
 )
@@ -36,14 +35,12 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 		query := body.Query
 		fields := body.Fields
 		if fields != nil { // Field(s) specified
-			fmt.Println("FIELD SEARCH")
 			res := app.search(query, fields)
 			output = append(output, res...)
 		} else {
 			res := app.search(query, make([]string, 0))
 			output = append(output, res...)
 		}
-		fmt.Println(output)
 		c.JSON(200, output)
 	})
 
