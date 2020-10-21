@@ -50,8 +50,8 @@ func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, app *appIndexes)
 					output = append(output, res...)
 				}
 			} else {
-				res := app.search(query, make([]string, 0))
-				output = append(output, res...)
+				res, _ := app.search(query, make([]string, 0))
+				output = append(output, res...) // TODO: Send documents as well
 			}
 			// Convert to array of strings
 			out2 := make([]string, len(output))
