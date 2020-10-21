@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -76,7 +77,10 @@ func LoadIndexesFromDisk(app *appIndexes) {
 			return err
 		}
 		doc, _ := parseArbJSON(string(dat))
-		app.addIndex(doc)
+		filename := filepath.Base(path)
+		//filename := strings.Split(path, "\\")[1];
+		// New fucntion, specifically for loading from disk without weird duplicates
+		app.addIndexFromDisk(doc, filename)
 		return nil
 	})
 	end := time.Now()
@@ -93,7 +97,6 @@ func (appIndex *appIndexes) listIndexItems() []listItem {
 		newItem := listItem{i.field, make([]string, 0)}
 		i.index.Walk(func(k string, value interface{}) bool {
 			// v := value.(roaring64.Bitmap)
-			fmt.Println(k)
 			newItem.IndexValues = append(newItem.IndexValues, k)
 			return false
 		})
@@ -116,10 +119,52 @@ func (appindex *appIndexes) addIndexMap(name string) *indexMap {
 	return &newIndexMap
 }
 
+func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, filename string) (documentID uint64) {
+	// fmt.Println("### Adding index...")
+	// Format the input
+	rand.Seed(time.Now().UnixNano())
+	id, _ := strconv.ParseUint(filename, 10, 64)
+	fmt.Println("id", id)
+	// fmt.Println("### ID:", id)
+	for k, v := range parsed {
+		// Don't index ID
+		if strings.ToLower(k) == "id" {
+			continue
+		}
+		// Find if indexMap already exists
+		var indexMapPointer *indexMap = nil
+		for i := 0; i < len(appindex.indexes); i++ {
+			if k == appindex.indexes[i].field {
+				indexMapPointer = &appindex.indexes[i]
+				break
+			}
+		}
+
+		if indexMapPointer == nil { // Create indexMap
+			indexMapPointer = appindex.addIndexMap(k)
+			// fmt.Println("### Creating new indexMap")
+		}
+
+		// Add index to indexMap
+		indexMapPointer.addIndex(id, fmt.Sprintf("%v", v))
+	}
+	// Write indexes document to disk
+	fmt.Sprintf("Writing out to: %s\n", fmt.Sprintf("./documents/%v", id))
+	sendback, _ := stringIndex(parsed)
+	ioutil.WriteFile(fmt.Sprintf("./documents/%v", id), []byte(sendback), os.ModePerm)
+	return id
+
+	// TODO: Store document
+	// TODO: check if tree exists with name of every json key, if not create tree
+
+}
+
 func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID uint64) {
 	// fmt.Println("### Adding index...")
 	// Format the input
+	rand.Seed(time.Now().UnixNano())
 	id := rand.Uint64()
+	fmt.Println("iD", id)
 	// fmt.Println("### ID:", id)
 	for k, v := range parsed {
 		// Don't index ID
@@ -236,8 +281,7 @@ func (indexmap *indexMap) addIndex(id uint64, value string) {
 			// fmt.Printf("### ADDED %v WITH IDS: %v ###\n", token, ids)
 		} else { // update node
 			node := prenode.(*roaring64.Bitmap)
-			newid := rand.Uint64()
-			node.Add(newid)
+			node.Add(id)
 			ids = node
 			_, updated := indexmap.index.Insert(token, ids)
 			if !updated {
@@ -270,6 +314,9 @@ func (indexmap *indexMap) search(input string) (documentIDs []uint64) {
 		return output
 	}
 	node := search.(*roaring64.Bitmap)
+	fmt.Println("node", node)
+	fmt.Println(node.ToArray())
+	fmt.Println(node.String())
 	output = append(output, node.ToArray()...)
 	return output
 }
