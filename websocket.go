@@ -20,8 +20,9 @@ var wsupgrader = websocket.Upgrader{
 }
 
 type WebsocketResponse struct {
-	TimeNS int64  `json:"timeNS"`
-	Result string `json:"result"`
+	TimeNS    int64    `json:"timeNS"`
+	DocIDs    string   `json:"docIDs"`
+	Documents []string `json:"documents"`
 }
 
 func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, app *appIndexes) {
@@ -40,6 +41,7 @@ func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, app *appIndexes)
 		flatJSON, _ := parseArbJSON(string(msg))
 		var body QueryBody
 		var output []uint64
+		documents := make([]string, 0)
 		if flatJSON["query"] != nil {
 			json.Unmarshal(msg, &body)
 			query := body.Query
@@ -50,8 +52,9 @@ func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, app *appIndexes)
 					output = append(output, res...)
 				}
 			} else {
-				res, _ := app.search(query, make([]string, 0))
+				res, docs := app.search(query, make([]string, 0))
 				output = append(output, res...) // TODO: Send documents as well
+				documents = append(documents, docs...)
 			}
 			// Convert to array of strings
 			out2 := make([]string, len(output))
@@ -62,8 +65,9 @@ func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, app *appIndexes)
 			out3 := strings.Trim(strings.Join(strings.Fields(fmt.Sprint(output)), ","), "[]")
 			end := time.Now()
 			resStruct := &WebsocketResponse{
-				Result: out3,
-				TimeNS: end.Sub(start).Nanoseconds(),
+				DocIDs:    out3,
+				TimeNS:    end.Sub(start).Nanoseconds(),
+				Documents: documents,
 			}
 			resBody, _ := json.Marshal(resStruct)
 			conn.WriteMessage(t, []byte(resBody))

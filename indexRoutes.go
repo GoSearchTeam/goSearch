@@ -6,13 +6,13 @@ import (
 )
 
 type QueryBody struct {
-	Query  string   `json:query`
-	Fields []string `json:fields`
+	Query  string   `json:"query"`
+	Fields []string `json:"fields"`
 }
 
 type SearchResponse struct {
-	DocIDs    []uint64      `json:docIDs`
-	Documents []interface{} `json:documents`
+	DocIDs    []uint64      `json:"docIDs"`
+	Documents []interface{} `json:"documents"`
 }
 
 func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
