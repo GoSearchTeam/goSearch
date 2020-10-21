@@ -8,9 +8,9 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
-	"strconv"
 )
 
 type indexMap struct {
@@ -77,12 +77,10 @@ func LoadIndexesFromDisk(app *appIndexes) {
 			return err
 		}
 		doc, _ := parseArbJSON(string(dat))
-		filename := filepath.Base(path);
+		filename := filepath.Base(path)
 		//filename := strings.Split(path, "\\")[1];
-		fmt.Println(doc);
-		fmt.Println(filename);
 		// New fucntion, specifically for loading from disk without weird duplicates
-		app.addIndexFromDisk(doc, filename);
+		app.addIndexFromDisk(doc, filename)
 		return nil
 	})
 	end := time.Now()
@@ -99,7 +97,6 @@ func (appIndex *appIndexes) listIndexItems() []listItem {
 		newItem := listItem{i.field, make([]string, 0)}
 		i.index.Walk(func(k string, value interface{}) bool {
 			// v := value.(roaring64.Bitmap)
-			fmt.Println(k)
 			newItem.IndexValues = append(newItem.IndexValues, k)
 			return false
 		})
@@ -126,8 +123,8 @@ func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, file
 	// fmt.Println("### Adding index...")
 	// Format the input
 	rand.Seed(time.Now().UnixNano())
-	id, _ := strconv.ParseUint(filename, 10, 64);
-	fmt.Println(id)
+	id, _ := strconv.ParseUint(filename, 10, 64)
+	fmt.Println("id", id)
 	// fmt.Println("### ID:", id)
 	for k, v := range parsed {
 		// Don't index ID
@@ -167,7 +164,7 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 	// Format the input
 	rand.Seed(time.Now().UnixNano())
 	id := rand.Uint64()
-	fmt.Println(id)
+	fmt.Println("iD", id)
 	// fmt.Println("### ID:", id)
 	for k, v := range parsed {
 		// Don't index ID
@@ -284,8 +281,7 @@ func (indexmap *indexMap) addIndex(id uint64, value string) {
 			// fmt.Printf("### ADDED %v WITH IDS: %v ###\n", token, ids)
 		} else { // update node
 			node := prenode.(*roaring64.Bitmap)
-			newid := rand.Uint64()
-			node.Add(newid)
+			node.Add(id)
 			ids = node
 			_, updated := indexmap.index.Insert(token, ids)
 			if !updated {
@@ -318,7 +314,7 @@ func (indexmap *indexMap) search(input string) (documentIDs []uint64) {
 		return output
 	}
 	node := search.(*roaring64.Bitmap)
-	fmt.Println(node)
+	fmt.Println("node", node)
 	fmt.Println(node.ToArray())
 	fmt.Println(node.String())
 	output = append(output, node.ToArray()...)
