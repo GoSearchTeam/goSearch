@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"io/ioutil"
 )
@@ -13,6 +14,10 @@ type QueryBody struct {
 type SearchResponse struct {
 	DocIDs    []uint64      `json:"docIDs"`
 	Documents []interface{} `json:"documents"`
+}
+
+type AddMultipleIndex struct {
+	Items []map[string]interface{} `json:"items"`
 }
 
 func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
@@ -65,5 +70,18 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 		// 	fmt.Printf("Key: %s Value: %s\n", k, v)
 		// }
 		c.String(200, "Added Index")
+	})
+
+	r.POST("/index/addMultiple", func(c *gin.Context) {
+		data, _ := ioutil.ReadAll(c.Request.Body)
+		jDat := AddMultipleIndex{}
+		json.Unmarshal([]byte(data), &jDat)
+		for _, item := range jDat.Items {
+			app.addIndex(item)
+		}
+		// for k, v := range jDat {
+		// 	fmt.Printf("Key: %s Value: %s\n", k, v)
+		// }
+		c.String(200, "Added Indexes")
 	})
 }

@@ -326,3 +326,18 @@ func (indexmap *indexMap) search(input string) (documentIDs []uint64) {
 	output = append(output, node.ToArray()...)
 	return output
 }
+
+func (indexmap *indexMap) beginsWithSearch(input string) (documentIDs []uint64) {
+	var output []uint64
+	count := 0
+	indexmap.index.WalkPrefix(input, func(key string, value interface{}) bool {
+		if count >= 100 {
+			return true
+		}
+		node := value.(*roaring64.Bitmap)
+		output = append(output, node.ToArray()...)
+		count++
+		return false
+	})
+	return output
+}
