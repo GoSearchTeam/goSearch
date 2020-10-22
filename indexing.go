@@ -87,6 +87,12 @@ func LoadIndexesFromDisk(app *appIndexes) {
 	fmt.Printf("### Loaded %d file(s) in %v ###\n", len(files), end.Sub(start))
 }
 
+func fetchDocument(docID uint64) string {
+	// TODO: Optimize to maybe not load this all into memory?
+	dat, _ := ioutil.ReadFile(fmt.Sprintf("./documents/%v", docID))
+	return string(dat)
+}
+
 // ########################################################################
 // ######################## appIndexes functions ##########################
 // ########################################################################
@@ -124,7 +130,6 @@ func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, file
 	// Format the input
 	rand.Seed(time.Now().UnixNano())
 	id, _ := strconv.ParseUint(filename, 10, 64)
-	fmt.Println("id", id)
 	// fmt.Println("### ID:", id)
 	for k, v := range parsed {
 		// Don't index ID
@@ -164,7 +169,6 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 	// Format the input
 	rand.Seed(time.Now().UnixNano())
 	id := rand.Uint64()
-	fmt.Println("iD", id)
 	// fmt.Println("### ID:", id)
 	for k, v := range parsed {
 		// Don't index ID
@@ -199,8 +203,9 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 
 }
 
-func (appindex *appIndexes) search(input string, fields []string) (documentIDs []uint64) {
+func (appindex *appIndexes) search(input string, fields []string) (documentIDs []uint64, documents []string) {
 	var output []uint64
+	docs := make([]string, 0)
 	// Tokenize input
 	for _, token := range lowercaseTokens(tokenizeString(input)) {
 		// Check fields
@@ -222,7 +227,10 @@ func (appindex *appIndexes) search(input string, fields []string) (documentIDs [
 			}
 		}
 	}
-	return output
+	for _, docID := range output {
+		docs = append(docs, fetchDocument(docID))
+	}
+	return output, docs
 }
 
 func (appindex *appIndexes) searchByField(input string, field string) (documentIDs []uint64) {
@@ -307,6 +315,7 @@ func (indexmap *indexMap) addIndex(id uint64, value string) {
 	}
 }
 
+// search returns an array of document ids
 func (indexmap *indexMap) search(input string) (documentIDs []uint64) {
 	var output []uint64
 	search, _ := indexmap.index.Get(input)
@@ -314,9 +323,21 @@ func (indexmap *indexMap) search(input string) (documentIDs []uint64) {
 		return output
 	}
 	node := search.(*roaring64.Bitmap)
-	fmt.Println("node", node)
-	fmt.Println(node.ToArray())
-	fmt.Println(node.String())
 	output = append(output, node.ToArray()...)
+	return output
+}
+
+func (indexmap *indexMap) beginsWithSearch(input string) (documentIDs []uint64) {
+	var output []uint64
+	count := 0
+	indexmap.index.WalkPrefix(input, func(key string, value interface{}) bool {
+		if count >= 100 {
+			return true
+		}
+		node := value.(*roaring64.Bitmap)
+		output = append(output, node.ToArray()...)
+		count++
+		return false
+	})
 	return output
 }
