@@ -14,7 +14,7 @@ func main() {
 	go func() {
 		// cluster := initCluster()
 		CheckDocumentsFolder()
-		// LoadIndexesFromDisk(app)
+		LoadIndexesFromDisk(app)
 		StartWebserver(app)
 	}()
 	<-c

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	"encoding/gob"
 	"fmt"
 	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/armon/go-radix"
@@ -63,50 +63,32 @@ func CheckDocumentsFolder() {
 }
 
 func LoadIndexesFromDisk(app *appIndexes) { // TODO: Change to search folders and load based on app
-	// TODO: Change to load in serialized
-	// files := make([]string, 0)
 	start := time.Now()
-	// filepath.Walk("./documents", func(path string, info os.FileInfo, err error) error {
-	// 	if info.IsDir() {
-	// 		return nil
-	// 	}
-	// 	files = append(files, path)
-	// 	// Load document into index
-	// 	dat, err := ioutil.ReadFile(path)
-	// 	if err != nil {
-	// 		fmt.Println(err)
-	// 		return err
-	// 	}
-	// 	doc, _ := parseArbJSON(string(dat))
-	// 	filename := filepath.Base(path)
-	// 	//filename := strings.Split(path, "\\")[1];
-	// 	// New fucntion, specifically for loading from disk without weird duplicates
-	// 	app.addIndexFromDisk(doc, filename)
-	// 	return nil
-	// })
 	filepath.Walk(fmt.Sprintf("./serialized/%s", app.name), func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
 		}
 		fieldName := filepath.Base(path)
-		fmt.Println(fieldName)
 		indexInd := len(app.indexes)
 		app.addIndexMap(fieldName)
-		byteArr, readErr := ioutil.ReadFile(path)
-		newTree := make(map[string]interface{})
-		fmt.Println("pre encode", newTree)
-		fmt.Println("byte len", len(byteArr))
-		json.Unmarshal(byteArr, &newTree)
-		fmt.Println("post encode", newTree)
-		if readErr != nil {
-			fmt.Errorf("Error reading serialized index file: %v", readErr)
+
+		decodeFile, err := os.Open(path)
+		defer decodeFile.Close()
+		d := gob.NewDecoder(decodeFile)
+		decoded := make(map[string]*roaring64.Bitmap)
+		err = d.Decode(&decoded)
+
+		converted := make(map[string]interface{})
+
+		for key, value := range decoded {
+			converted[key] = value
 		}
-		app.indexes[indexInd].index = radix.NewFromMap(newTree)
+
+		app.indexes[indexInd].index = radix.NewFromMap(converted)
 		return nil
 	})
 	end := time.Now()
 	fmt.Printf("### Loaded serialized indexes in %v\n", end.Sub(start))
-	// fmt.Printf("### Loaded %d file(s) in %v ###\n", len(files), end.Sub(start))
 
 }
 
@@ -287,13 +269,17 @@ func (appindex *appIndexes) SerializeIndex() {
 	}
 	for _, i := range appindex.indexes {
 		serializedTree := i.index.ToMap()
-		fmt.Println("the map", serializedTree)
-		serialJSON, err := json.Marshal(serializedTree)
-		fmt.Println("the map len", len(serialJSON))
+		encodeFile, err := os.Create(fmt.Sprintf("./serialized/%s/%s", appindex.name, i.field))
 		if err != nil {
-			fmt.Errorf("!!! Error serializing", err)
+			panic(err)
 		}
-		ioutil.WriteFile(fmt.Sprintf("./serialized/%s/%s", appindex.name, i.field), serialJSON, os.ModePerm) // Write to file named by field
+		e := gob.NewEncoder(encodeFile)
+		converted := make(map[string]*roaring64.Bitmap)
+		for key, value := range serializedTree {
+			converted[key] = value.(*roaring64.Bitmap)
+		}
+		err = e.Encode(converted)
+		encodeFile.Close()
 	}
 	fmt.Printf("### Successfully Serialized %s Index!\n", appindex.name)
 }
