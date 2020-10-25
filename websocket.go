@@ -39,20 +39,20 @@ func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, app *appIndexes)
 		}
 		start := time.Now()
 		flatJSON, _ := parseArbJSON(string(msg))
-		var body QueryBody
+		body := QueryBody{BeginsWith: false}
 		var output []uint64
 		documents := make([]string, 0)
 		if flatJSON["query"] != nil {
 			json.Unmarshal(msg, &body)
 			query := body.Query
 			fields := body.Fields
+			bw := body.BeginsWith
 			if fields != nil { // Field(s) specified
-				for _, i := range fields {
-					res := app.searchByField(query, i)
-					output = append(output, res...)
-				}
+				res, docs := app.search(query, fields, bw)
+				output = append(output, res...)
+				documents = append(documents, docs...)
 			} else {
-				res, docs := app.search(query, make([]string, 0))
+				res, docs := app.search(query, make([]string, 0), bw)
 				output = append(output, res...) // TODO: Send documents as well
 				documents = append(documents, docs...)
 			}

@@ -2,13 +2,15 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"io/ioutil"
 )
 
 type QueryBody struct {
-	Query  string   `json:"query"`
-	Fields []string `json:"fields"`
+	Query      string   `json:"query"`
+	Fields     []string `json:"fields"`
+	BeginsWith bool     `json:"beginsWith"`
 }
 
 type SearchResponse struct {
@@ -38,19 +40,20 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 	r.POST("/index/search", func(c *gin.Context) {
 		// data, _ := ioutil.ReadAll(c.Request.Body)
 		// jDat, _ := parseArbJSON(string(data))
-		var body QueryBody
+		body := QueryBody{BeginsWith: false} // Default false if not included
 		c.BindJSON(&body)
 		var output []uint64 // temporary, will turn into documents later
 		documents := make([]string, 0)
 		// query := jDat["query"].(string)
 		query := body.Query
 		fields := body.Fields
+		bw := body.BeginsWith
 		if fields != nil { // Field(s) specified
-			res, docs := app.search(query, fields)
+			res, docs := app.search(query, fields, bw)
 			output = append(output, res...)
 			documents = append(documents, docs...)
 		} else {
-			res, docs := app.search(query, make([]string, 0))
+			res, docs := app.search(query, make([]string, 0), bw)
 			output = append(output, res...)
 			documents = append(documents, docs...)
 		}

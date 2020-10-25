@@ -203,7 +203,7 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 
 }
 
-func (appindex *appIndexes) search(input string, fields []string) (documentIDs []uint64, documents []string) {
+func (appindex *appIndexes) search(input string, fields []string, bw bool) (documentIDs []uint64, documents []string) {
 	var output []uint64
 	docs := make([]string, 0)
 	// Tokenize input
@@ -213,12 +213,16 @@ func (appindex *appIndexes) search(input string, fields []string) (documentIDs [
 			// fmt.Println("### No fields given, searching all fields...")
 			for _, indexmap := range appindex.indexes {
 				// fmt.Println("### Searching index:", indexmap.field, "for", token)
-				output = append(output, indexmap.search(token)...)
+				if bw {
+					output = append(output, indexmap.beginsWithSearch(token)...)
+				} else {
+					output = append(output, indexmap.search(token)...)
+				}
 			}
 		} else { // check given fields
 			for _, field := range fields {
 				// fmt.Println("### Searching index:", field, "for", token)
-				docIDs := appindex.searchByField(token, field)
+				docIDs := appindex.searchByField(token, field, bw)
 				if docIDs == nil {
 					// fmt.Println("### Field doesn't exist:", field)
 					continue
@@ -233,12 +237,16 @@ func (appindex *appIndexes) search(input string, fields []string) (documentIDs [
 	return output, docs
 }
 
-func (appindex *appIndexes) searchByField(input string, field string) (documentIDs []uint64) {
+func (appindex *appIndexes) searchByField(input string, field string, bw bool) (documentIDs []uint64) {
 	// Check if field exists
 	var output []uint64
 	for _, indexmap := range appindex.indexes {
 		if indexmap.field == field {
-			output = append(output, indexmap.search(input)...)
+			if bw {
+				output = append(output, indexmap.beginsWithSearch(input)...)
+			} else {
+				output = append(output, indexmap.search(input)...)
+			}
 			break
 		}
 	}
