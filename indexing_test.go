@@ -36,14 +36,17 @@ func TestSearch(t *testing.T) {
 	}`)
 	burgerID := app.addIndex(burgerData)
 
-	tacoSearch, _ := app.search("tacos", fields, false)
-	burgerSearch, _ := app.search("burger", fields, false)
+	tacoSearchID, tacoSearchData := app.search("tacos", fields, false)
+	burgerSearchID, burgerSearchData := app.search("burger", fields, false)
 
 	ids := []uint64{tacoID, burgerID}
 	documentsCleanup(ids)
 
-	if tacoSearch[0] != tacoID || burgerSearch[0] != burgerID {
+	if tacoSearchID[0] != tacoID || burgerSearchID[0] != burgerID {
 		t.Error("ID's didnt match")
+	}
+	if tacoSearchData[0] != `{"name":"tacos"}` || burgerSearchData[0] != `{"name":"burger"}` {
+		t.Error("Documents didnt match")
 	}
 
 }
