@@ -3,14 +3,19 @@
   <title>WebSocket Test</title>
   <input type="text" id="inputBox" />
   <script language="javascript" type="text/javascript">
-
-  var wsUri = "ws://localhost:8080/ws";
   var output;
 
-  function init()
+  async function init()
   {
     output = document.getElementById("output");
-    testWebSocket();
+    token = await getToken()
+    testWebSocket(token);
+  }
+
+  async function getToken() {
+    res = await fetch("http://localhost:8080/ws/auth")
+    json = await res.json()
+    return json.token
   }
 
   document.getElementById("inputBox").addEventListener('input', function(event) {
@@ -21,9 +26,9 @@
     }))
   })
 
-  function testWebSocket()
+  function testWebSocket(token)
   {
-    websocket = new WebSocket(wsUri);
+    websocket = new WebSocket(`ws://localhost:8080/ws?token=${token}`);
     websocket.onopen = function(evt) { onOpen(evt) };
     websocket.onclose = function(evt) { onClose(evt) };
     websocket.onmessage = function(evt) { onMessage(evt) };
