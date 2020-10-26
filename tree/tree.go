@@ -91,9 +91,9 @@ func (t *Tree) FindAndPrint(key int, verbose bool) {
 	r, err := t.Find(key, verbose)
 
 	if err != nil || r == nil {
-		fmt.Printf("Record not found under key %d.\n", key)
+		log.Printf("Record not found under key %d.\n", key)
 	} else {
-		fmt.Printf("Record at %d -- key %d, value %s.\n", r, key, r.Value)
+		log.Printf("Record at %d -- key %d, value %s.\n", r, key, r.Value)
 	}
 }
 
@@ -104,11 +104,11 @@ func (t *Tree) FindAndPrintRange(key_start, key_end int, verbose bool) {
 	returned_pointers := make([]interface{}, array_size)
 	num_found := t.findRange(key_start, key_end, verbose, returned_keys, returned_pointers)
 	if num_found == 0 {
-		fmt.Println("None found,\n")
+		log.Println("None found,\n")
 	} else {
 		for i = 0; i < num_found; i++ {
 			c, _ := returned_pointers[i].(*Record)
-			fmt.Printf("Key: %d  Location: %d  Value: %s\n",
+			log.Printf("Key: %d  Location: %d  Value: %s\n",
 				returned_keys[i],
 				returned_pointers[i],
 				c.Value)
@@ -123,7 +123,7 @@ func (t *Tree) PrintTree() {
 	new_rank := 0
 
 	if t.Root == nil {
-		fmt.Printf("Empty tree.\n")
+		log.Printf("Empty tree.\n")
 		return
 	}
 	queue = nil
@@ -134,17 +134,17 @@ func (t *Tree) PrintTree() {
 			if n.Parent != nil && n == n.Parent.Pointers[0] {
 				new_rank = t.pathToRoot(n)
 				if new_rank != rank {
-					fmt.Printf("\n")
+					log.Printf("\n")
 				}
 			}
 			if verbose_output {
-				fmt.Printf("(%d)", n)
+				log.Printf("(%d)", n)
 			}
 			for i = 0; i < n.NumKeys; i++ {
 				if verbose_output {
-					fmt.Printf("%d ", n.Pointers[i])
+					log.Printf("%d ", n.Pointers[i])
 				}
-				fmt.Printf("%d ", n.Keys[i])
+				log.Printf("%d ", n.Keys[i])
 			}
 			if !n.IsLeaf {
 				for i = 0; i <= n.NumKeys; i++ {
@@ -154,20 +154,20 @@ func (t *Tree) PrintTree() {
 			}
 			if verbose_output {
 				if n.IsLeaf {
-					fmt.Printf("%d ", n.Pointers[order-1])
+					log.Printf("%d ", n.Pointers[order-1])
 				} else {
-					fmt.Printf("%d ", n.Pointers[n.NumKeys])
+					log.Printf("%d ", n.Pointers[n.NumKeys])
 				}
 			}
-			fmt.Printf(" | ")
+			log.Printf(" | ")
 		}
 	}
-	fmt.Printf("\n")
+	log.Printf("\n")
 }
 
 func (t *Tree) PrintLeaves() {
 	if t.Root == nil {
-		fmt.Printf("Empty tree.\n")
+		log.Printf("Empty tree.\n")
 		return
 	}
 
@@ -180,21 +180,21 @@ func (t *Tree) PrintLeaves() {
 	for {
 		for i = 0; i < c.NumKeys; i++ {
 			if verbose_output {
-				fmt.Printf("%d ", c.Pointers[i])
+				log.Printf("%d ", c.Pointers[i])
 			}
-			fmt.Printf("%d ", c.Keys[i])
+			log.Printf("%d ", c.Keys[i])
 		}
 		if verbose_output {
-			fmt.Printf("%d ", c.Pointers[order-1])
+			log.Printf("%d ", c.Pointers[order-1])
 		}
 		if c.Pointers[order-1] != nil {
-			fmt.Printf(" | ")
+			log.Printf(" | ")
 			c, _ = c.Pointers[order-1].(*Node)
 		} else {
 			break
 		}
 	}
-	fmt.Printf("\n")
+	log.Printf("\n")
 }
 
 func (t *Tree) Delete(key int) error {
@@ -296,17 +296,17 @@ func (t *Tree) findLeaf(key int, verbose bool) *Node {
 	c := t.Root
 	if c == nil {
 		if verbose {
-			fmt.Printf("Empty tree.\n")
+			log.Printf("Empty tree.\n")
 		}
 		return c
 	}
 	for !c.IsLeaf {
 		if verbose {
-			fmt.Printf("[")
+			log.Printf("[")
 			for i = 0; i < c.NumKeys-1; i++ {
-				fmt.Printf("%d ", c.Keys[i])
+				log.Printf("%d ", c.Keys[i])
 			}
-			fmt.Printf("%d]", c.Keys[i])
+			log.Printf("%d]", c.Keys[i])
 		}
 		i = 0
 		for i < c.NumKeys {
@@ -317,16 +317,16 @@ func (t *Tree) findLeaf(key int, verbose bool) *Node {
 			}
 		}
 		if verbose {
-			fmt.Printf("%d ->\n", i)
+			log.Printf("%d ->\n", i)
 		}
 		c, _ = c.Pointers[i].(*Node)
 	}
 	if verbose {
-		fmt.Printf("Leaf [")
+		log.Printf("Leaf [")
 		for i = 0; i < c.NumKeys-1; i++ {
-			fmt.Printf("%d ", c.Keys[i])
+			log.Printf("%d ", c.Keys[i])
 		}
-		fmt.Printf("%d] ->\n", c.Keys[i])
+		log.Printf("%d] ->\n", c.Keys[i])
 	}
 	return c
 }

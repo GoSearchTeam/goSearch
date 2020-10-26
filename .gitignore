@@ -4,3 +4,4 @@ moviedata.json
 *.tfstate*
 documents
 serialized
+*.log

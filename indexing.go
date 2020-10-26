@@ -6,6 +6,7 @@ import (
 	"github.com/RoaringBitmap/roaring/roaring64"
 	"github.com/armon/go-radix"
 	"io/ioutil"
+	"log"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -88,7 +89,7 @@ func LoadIndexesFromDisk(app *appIndexes) { // TODO: Change to search folders an
 		return nil
 	})
 	end := time.Now()
-	fmt.Printf("### Loaded serialized indexes in %v\n", end.Sub(start))
+	log.Printf("### Loaded serialized indexes in %v\n", end.Sub(start))
 
 }
 
@@ -132,11 +133,11 @@ func (appindex *appIndexes) addIndexMap(name string) *indexMap {
 }
 
 func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, filename string) (documentID uint64) {
-	// fmt.Println("### Adding index...")
+	// log.Println("### Adding index...")
 	// Format the input
 	rand.Seed(time.Now().UnixNano())
 	id, _ := strconv.ParseUint(filename, 10, 64)
-	// fmt.Println("### ID:", id)
+	// log.Println("### ID:", id)
 	for k, v := range parsed {
 		// Don't index ID
 		if strings.ToLower(k) == "id" {
@@ -153,7 +154,7 @@ func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, file
 
 		if indexMapPointer == nil { // Create indexMap
 			indexMapPointer = appindex.addIndexMap(k)
-			// fmt.Println("### Creating new indexMap")
+			// log.Println("### Creating new indexMap")
 		}
 
 		// Add index to indexMap
@@ -171,11 +172,11 @@ func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, file
 }
 
 func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID uint64) {
-	// fmt.Println("### Adding index...")
+	// log.Println("### Adding index...")
 	// Format the input
 	rand.Seed(time.Now().UnixNano())
 	id := rand.Uint64()
-	// fmt.Println("### ID:", id)
+	// log.Println("### ID:", id)
 	for k, v := range parsed {
 		// Don't index ID
 		if strings.ToLower(k) == "id" {
@@ -192,7 +193,7 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 
 		if indexMapPointer == nil { // Create indexMap
 			indexMapPointer = appindex.addIndexMap(k)
-			// fmt.Println("### Creating new indexMap")
+			// log.Println("### Creating new indexMap")
 		}
 
 		// Add index to indexMap
@@ -216,9 +217,9 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 	for _, token := range lowercaseTokens(tokenizeString(input)) {
 		// Check fields
 		if len(fields) == 0 { // check all
-			// fmt.Println("### No fields given, searching all fields...")
+			// log.Println("### No fields given, searching all fields...")
 			for _, indexmap := range appindex.indexes {
-				// fmt.Println("### Searching index:", indexmap.field, "for", token)
+				// log.Println("### Searching index:", indexmap.field, "for", token)
 				if bw {
 					output = append(output, indexmap.beginsWithSearch(token)...)
 				} else {
@@ -227,10 +228,10 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 			}
 		} else { // check given fields
 			for _, field := range fields {
-				// fmt.Println("### Searching index:", field, "for", token)
+				// log.Println("### Searching index:", field, "for", token)
 				docIDs := appindex.searchByField(token, field, bw)
 				if docIDs == nil {
-					// fmt.Println("### Field doesn't exist:", field)
+					// log.Println("### Field doesn't exist:", field)
 					continue
 				}
 				output = append(output, docIDs...)
@@ -260,7 +261,7 @@ func (appindex *appIndexes) searchByField(input string, field string, bw bool) (
 }
 
 func (appindex *appIndexes) SerializeIndex() {
-	fmt.Printf("### Serializing %s Index...\n", appindex.name)
+	log.Printf("### Serializing %s Index...\n", appindex.name)
 	if _, err := os.Stat("./serialized"); os.IsNotExist(err) { // Make sure serialized folder exists
 		os.Mkdir("./serialized", os.ModePerm)
 	}
@@ -281,7 +282,7 @@ func (appindex *appIndexes) SerializeIndex() {
 		err = e.Encode(converted)
 		encodeFile.Close()
 	}
-	fmt.Printf("### Successfully Serialized %s Index!\n", appindex.name)
+	log.Printf("### Successfully Serialized %s Index!\n", appindex.name)
 }
 
 // FuzzySearch performs a fuzzy search on a given tree - WARNING: FAR LESS EFFICIENT
@@ -289,12 +290,12 @@ func FuzzySearch(key string, t *radix.Tree) []fuzzyItem {
 	output := make([]fuzzyItem, 0)
 	split := strings.Split(key, "")
 	t.WalkPrefix(split[0], func(k string, value interface{}) bool {
-		// fmt.Println("### Checking", k)
+		// log.Println("### Checking", k)
 		includesAll := true
 		for _, char := range split {
-			// fmt.Println("### DOES", k, "include", char)
+			// log.Println("### DOES", k, "include", char)
 			if !strings.Contains(k, char) {
-				// fmt.Println("NOPE")
+				// log.Println("NOPE")
 				includesAll = false
 				break
 			}
@@ -315,7 +316,7 @@ func (indexmap *indexMap) addIndex(id uint64, value string) {
 	CheckDocumentsFolder()
 	// Tokenize
 	for _, token := range lowercaseTokens(tokenizeString(value)) {
-		// fmt.Println("### INDEXING:", token)
+		// log.Println("### INDEXING:", token)
 		// Check if index already exists
 		prenode, _ := indexmap.index.Get(token)
 		var ids *roaring64.Bitmap
@@ -325,7 +326,7 @@ func (indexmap *indexMap) addIndex(id uint64, value string) {
 			if updated {
 				fmt.Errorf("### SOMEHOW UPDATED WHEN INSERTING NEW ###\n")
 			}
-			// fmt.Printf("### ADDED %v WITH IDS: %v ###\n", token, ids)
+			// log.Printf("### ADDED %v WITH IDS: %v ###\n", token, ids)
 		} else { // update node
 			node := prenode.(*roaring64.Bitmap)
 			node.Add(id)
@@ -334,14 +335,14 @@ func (indexmap *indexMap) addIndex(id uint64, value string) {
 			if !updated {
 				fmt.Errorf("### SOMEHOW DIDN'T UPDATE WHEN UPDATING INDEX ###\n")
 			}
-			// fmt.Printf("### UPDATED %v WITH IDS: %v ###\n", token, ids)
+			// log.Printf("### UPDATED %v WITH IDS: %v ###\n", token, ids)
 		}
 		// if indexmap.index[token] != nil {
 		// 	var found bool = false
 		// 	for _, docID := range indexmap.index[token] {
-		// 		// fmt.Println("### Found token, Checking if doc exists...")
+		// 		// log.Println("### Found token, Checking if doc exists...")
 		// 		if docID == id {
-		// 			// fmt.Println("### Skip to avoid duplicates")
+		// 			// log.Println("### Skip to avoid duplicates")
 		// 			found = true
 		// 			break
 		// 		}

@@ -26,7 +26,7 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 		list := app.listIndexItems()
 		// stringed := make([]string, 0)
 		// for _, i := range list {
-		// 	fmt.Println(i)
+		// 	log.Println(i)
 		// }
 		c.JSON(200, list)
 	})
@@ -69,7 +69,7 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 		jDat, _ := parseArbJSON(string(data))
 		app.addIndex(jDat)
 		// for k, v := range jDat {
-		// 	fmt.Printf("Key: %s Value: %s\n", k, v)
+		// 	log.Printf("Key: %s Value: %s\n", k, v)
 		// }
 		c.String(200, "Added Index")
 	})
@@ -82,7 +82,7 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 			app.addIndex(item)
 		}
 		// for k, v := range jDat {
-		// 	fmt.Printf("Key: %s Value: %s\n", k, v)
+		// 	log.Printf("Key: %s Value: %s\n", k, v)
 		// }
 		c.String(200, "Added Indexes")
 	})

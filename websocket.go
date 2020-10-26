@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -28,7 +29,7 @@ type WebsocketResponse struct {
 func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, app *appIndexes) {
 	conn, err := wsupgrader.Upgrade(w, r, nil)
 	if err != nil {
-		fmt.Println("Failed to set websocket upgrade: %v", err)
+		log.Println("Failed to set websocket upgrade: %v", err)
 		return
 	}
 
