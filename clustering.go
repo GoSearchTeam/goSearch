@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 )
@@ -49,7 +50,7 @@ func (cluster *Cluster) DiscoverNodes(ipList *[]string) {
 	// Add each node to cluster nodes
 	// Ask each node if they know of other nodes
 	// Contact and add those nodes to list of they don't already exist
-	fmt.Println("### DISCOVERING OTHER NODES ###")
+	log.Println("### DISCOVERING OTHER NODES ###")
 	httpClient := &http.Client{Timeout: 10 * time.Second}
 	for _, ip := range *ipList {
 		// Contact item
@@ -61,7 +62,7 @@ func (cluster *Cluster) DiscoverNodes(ipList *[]string) {
 		jsonResponse := &ClusterDiscoverResponse{}
 		json.NewDecoder(r.Body).Decode(jsonResponse)
 
-		fmt.Println(jsonResponse)
+		log.Println(jsonResponse)
 	}
 }
 

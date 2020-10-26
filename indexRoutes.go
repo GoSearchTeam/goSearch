@@ -7,8 +7,9 @@ import (
 )
 
 type QueryBody struct {
-	Query  string   `json:"query"`
-	Fields []string `json:"fields"`
+	Query      string   `json:"query"`
+	Fields     []string `json:"fields"`
+	BeginsWith bool     `json:"beginsWith"`
 }
 
 type SearchResponse struct {
@@ -25,7 +26,7 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 		list := app.listIndexItems()
 		// stringed := make([]string, 0)
 		// for _, i := range list {
-		// 	fmt.Println(i)
+		// 	log.Println(i)
 		// }
 		c.JSON(200, list)
 	})
@@ -38,19 +39,20 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 	r.POST("/index/search", func(c *gin.Context) {
 		// data, _ := ioutil.ReadAll(c.Request.Body)
 		// jDat, _ := parseArbJSON(string(data))
-		var body QueryBody
+		body := QueryBody{BeginsWith: false} // Default false if not included
 		c.BindJSON(&body)
 		var output []uint64 // temporary, will turn into documents later
 		documents := make([]string, 0)
 		// query := jDat["query"].(string)
 		query := body.Query
 		fields := body.Fields
+		bw := body.BeginsWith
 		if fields != nil { // Field(s) specified
-			res, docs := app.search(query, fields)
+			res, docs := app.search(query, fields, bw)
 			output = append(output, res...)
 			documents = append(documents, docs...)
 		} else {
-			res, docs := app.search(query, make([]string, 0))
+			res, docs := app.search(query, make([]string, 0), bw)
 			output = append(output, res...)
 			documents = append(documents, docs...)
 		}
@@ -67,7 +69,7 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 		jDat, _ := parseArbJSON(string(data))
 		app.addIndex(jDat)
 		// for k, v := range jDat {
-		// 	fmt.Printf("Key: %s Value: %s\n", k, v)
+		// 	log.Printf("Key: %s Value: %s\n", k, v)
 		// }
 		c.String(200, "Added Index")
 	})
@@ -80,7 +82,7 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 			app.addIndex(item)
 		}
 		// for k, v := range jDat {
-		// 	fmt.Printf("Key: %s Value: %s\n", k, v)
+		// 	log.Printf("Key: %s Value: %s\n", k, v)
 		// }
 		c.String(200, "Added Indexes")
 	})

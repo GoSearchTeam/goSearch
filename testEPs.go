@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"io/ioutil"
+	"log"
 )
 
 func HandleTestRoutes(r *gin.Engine) {
@@ -16,7 +16,7 @@ func HandleTestRoutes(r *gin.Engine) {
 	r.POST("/test", func(c *gin.Context) {
 		data, _ := ioutil.ReadAll(c.Request.Body)
 		jDat, _ := parseArbJSON(string(data))
-		fmt.Println(jDat["test"])
+		log.Println(jDat["test"])
 		c.String(200, "ok")
 	})
 }
