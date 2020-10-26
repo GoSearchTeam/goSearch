@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -121,7 +122,13 @@ func HandleWebsocketRoutes(r *gin.Engine, app *appIndexes) {
 		newUUID, _ := uuid.NewRandom()
 		userID := fmt.Sprintf("user#%v", newUUID)
 		jwtClaims := jwt.MapClaims{}
-		jwtClaims["exp"] = time.Now().Add(1 * time.Minute).Unix() // 20 minutes
+		var expireMin time.Duration
+		expireMin, err := time.ParseDuration(os.Getenv("JWT_EXP"))
+		fmt.Println(os.Getenv("JWT_EXP"))
+		if err != nil {
+			expireMin = 20 * time.Minute
+		}
+		jwtClaims["exp"] = time.Now().Add(expireMin).Unix() // 20 minutes default
 		jwtClaims["iat"] = time.Now().Unix()
 		jwtClaims["userID"] = userID
 		accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwtClaims)
