@@ -3,7 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
@@ -20,19 +22,51 @@ var wsupgrader = websocket.Upgrader{
 	},
 }
 
+var jwts []jwt.Token
+
+var jwtSecret string = "thisisanexamplesecret"
+
 type WebsocketResponse struct {
 	TimeNS    int64    `json:"timeNS"`
 	DocIDs    string   `json:"docIDs"`
 	Documents []string `json:"documents"`
 }
 
-func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, app *appIndexes) {
+type WebsocketAuthValidResponse struct {
+	JWT string `json:"token"`
+}
+
+func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, c *gin.Context, app *appIndexes) {
+	// Validate ws connection
+	jwtQuery := c.Request.URL.Query()["token"][0]
+
+	token, err := jwt.Parse(jwtQuery, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(jwtSecret), nil
+	})
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		// Check exists
+
+	} else if int64(claims["exp"].(float64)) <= time.Now().Unix() { // Check expired
+		c.JSON(401, gin.H{
+			"msg": "Token Expired",
+		})
+		return
+	} else {
+		c.JSON(401, gin.H{
+			"msg": "Token Invalid",
+		})
+		return
+	}
+
 	conn, err := wsupgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("Failed to set websocket upgrade: %v", err)
 		return
 	}
-
 	for {
 		t, msg, err := conn.ReadMessage()
 		if err != nil {
@@ -80,6 +114,18 @@ func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, app *appIndexes)
 
 func HandleWebsocketRoutes(r *gin.Engine, app *appIndexes) {
 	r.GET("/ws", func(c *gin.Context) {
-		UpgradeToWebsocket(c.Writer, c.Request, app)
+		UpgradeToWebsocket(c.Writer, c.Request, c, app)
+	})
+
+	r.GET("/ws/auth", func(c *gin.Context) {
+		newUUID, _ := uuid.NewRandom()
+		userID := fmt.Sprintf("user#%v", newUUID)
+		jwtClaims := jwt.MapClaims{}
+		jwtClaims["exp"] = time.Now().Add(1 * time.Minute).Unix() // 20 minutes
+		jwtClaims["iat"] = time.Now().Unix()
+		jwtClaims["userID"] = userID
+		accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwtClaims)
+		token, _ := accessToken.SignedString([]byte(jwtSecret))
+		c.JSON(200, WebsocketAuthValidResponse{token})
 	})
 }
