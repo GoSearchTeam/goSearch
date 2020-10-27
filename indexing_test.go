@@ -23,8 +23,8 @@ func TestAddIndex(t *testing.T) {
 	documentsCleanup(ids)
 }
 
-func TestSearch(t *testing.T) {
-	app := initApp("TestAddIndex")
+func TestSmallSearch(t *testing.T) {
+	app := initApp("TestSmallSearch")
 	fields := []string{"name"}
 	tacoData, _ := parseArbJSON(`{
 		"name": "tacos"
@@ -48,7 +48,18 @@ func TestSearch(t *testing.T) {
 	if tacoSearchData[0] != `{"name":"tacos"}` || burgerSearchData[0] != `{"name":"burger"}` {
 		t.Error("Documents didnt match")
 	}
+}
 
+func TestFieldSearch(t *testing.T) {
+	app := initApp("TestFieldSearch")
+	benData := `{"name":"Ben","age":21,"food":"burgers"}`
+	// jimmyData := `{"name":"Jimmy","age":21,"food":"pizza"}`
+	// alexData := `{"name":"Alex","age":22,"food":"pizza"}`
+
+	benParsed, _ := parseArbJSON(benData)
+
+	benID := app.addIndex(benParsed)
+	t.Log(benID)
 }
 
 func documentsCleanup(docs []uint64) {
