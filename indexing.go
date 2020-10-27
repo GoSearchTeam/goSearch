@@ -3,8 +3,6 @@ package main
 import (
 	"encoding/gob"
 	"fmt"
-	"github.com/RoaringBitmap/roaring/roaring64"
-	"github.com/armon/go-radix"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -13,6 +11,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/RoaringBitmap/roaring/roaring64"
+	"github.com/armon/go-radix"
 )
 
 type indexMap struct {
@@ -65,7 +66,17 @@ func CheckDocumentsFolder() {
 
 func LoadIndexesFromDisk(app *appIndexes) { // TODO: Change to search folders and load based on app
 	start := time.Now()
+	if _, err := os.Stat("./serialized"); os.IsNotExist(err) { // Make sure serialized folder exists
+		os.Mkdir("./serialized", os.ModePerm)
+	}
+	if _, err := os.Stat(fmt.Sprintf("./serialized/%s", app.name)); os.IsNotExist(err) { // Make sure app folder exists
+		os.Mkdir(fmt.Sprintf("./serialized/%s", app.name), os.ModePerm)
+	}
 	filepath.Walk(fmt.Sprintf("./serialized/%s", app.name), func(path string, info os.FileInfo, err error) error {
+		if info == nil {
+			fmt.Println("Error: ./serialized/%s does not exist", app.name)
+			return nil
+		}
 		if info.IsDir() {
 			return nil
 		}
