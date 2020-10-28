@@ -2,7 +2,10 @@ package main
 
 import (
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
+	"github.com/RoaringBitmap/roaring/roaring64"
+	"github.com/armon/go-radix"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -11,9 +14,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/RoaringBitmap/roaring/roaring64"
-	"github.com/armon/go-radix"
 )
 
 type indexMap struct {
@@ -151,7 +151,7 @@ func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, file
 	// log.Println("### ID:", id)
 	for k, v := range parsed {
 		// Don't index ID
-		if strings.ToLower(k) == "id" {
+		if strings.ToLower(k) == "docid" {
 			continue
 		}
 		// Find if indexMap already exists
@@ -186,11 +186,17 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 	// log.Println("### Adding index...")
 	// Format the input
 	rand.Seed(time.Now().UnixNano())
-	id := rand.Uint64()
+	var id uint64
+	if parsed["docID"] != nil {
+		pre, _ := parsed["docID"].(json.Number).Int64()
+		id = uint64(pre)
+	} else {
+		id = rand.Uint64()
+	}
 	// log.Println("### ID:", id)
 	for k, v := range parsed {
 		// Don't index ID
-		if strings.ToLower(k) == "id" {
+		if strings.ToLower(k) == "docid" {
 			continue
 		}
 		// Find if indexMap already exists
@@ -210,6 +216,8 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 		// Add index to indexMap
 		indexMapPointer.addIndex(id, fmt.Sprintf("%v", v))
 	}
+	// Remove docID field
+	delete(parsed, "docID")
 	// Write indexes document to disk
 	fmt.Sprintf("Writing out to: %s\n", fmt.Sprintf("./documents/%v", id))
 	sendback, _ := stringIndex(parsed)
@@ -296,7 +304,77 @@ func (appindex *appIndexes) SerializeIndex() {
 	log.Printf("### Successfully Serialized %s Index!\n", appindex.name)
 }
 
-// FuzzySearch performs a fuzzy search on a given tree - WARNING: FAR LESS EFFICIENT
+func (appindex *appIndexes) deleteIndex(docID uint64) error {
+	var err error = nil
+	// Find document on disk
+	docPath := fmt.Sprintf("./documents/%v", docID)
+	if _, err := os.Stat(docPath); os.IsNotExist(err) {
+		log.Printf("Error: DocID: %v does not exist\n", docID)
+		return err
+	}
+	docData, err := ioutil.ReadFile(docPath)
+	docString := string(docData)
+	docJSON, err := parseArbJSON(docString)
+	if err != nil {
+		return err
+	}
+	for k, v := range docJSON {
+		// Don't index ID
+		input := fmt.Sprintf("%v", v)
+		if strings.ToLower(k) == "docid" {
+			continue
+		}
+		// Find the field index
+		for i := 0; i < len(appindex.indexes); i++ {
+			if k == appindex.indexes[i].field {
+				indexmap := appindex.indexes[i]
+				// Tokenize field
+				for _, token := range lowercaseTokens(tokenizeString(input)) {
+					prenode, _ := indexmap.index.Get(token)
+					var ids *roaring64.Bitmap
+					if prenode == nil { // somehow not indexed
+						log.Printf("### Error: field not indexes from disk document (deleteIndex)")
+						continue
+					} else { // update node
+						node := prenode.(*roaring64.Bitmap)
+						node.Remove(docID)
+						ids = node
+						_, updated := indexmap.index.Insert(token, ids)
+						if !updated {
+							log.Printf("### SOMEHOW DIDN'T UPDATE WHEN DELETING INDEX ###\n")
+							continue
+						}
+					}
+				}
+				break
+			}
+		}
+	}
+	// Delete document on disk
+	err = os.Remove(docPath)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (appindex *appIndexes) updateIndex(parsed map[string]interface{}) error {
+	var err error = nil
+	// Validate docID
+	var docID uint64
+	pre, err := parsed["docID"].(json.Number).Int64()
+	docID = uint64(pre)
+	if err != nil {
+		return err
+	}
+	err = appindex.deleteIndex(docID)
+	if err != nil {
+		return err
+	}
+	appindex.addIndex(parsed)
+	return err
+}
+
 func FuzzySearch(key string, t *radix.Tree) []fuzzyItem {
 	output := make([]fuzzyItem, 0)
 	split := strings.Split(key, "")
