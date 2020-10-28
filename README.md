@@ -11,7 +11,10 @@ Full-Text Search Engine Written in Go
 
 #### Data Structures
 
-To build the high performing index and search core, we leveraged _inverted indexes_ and _maps_.
+To build the high performing index and search core, we leveraged _inverted indexes_, _roaring bitmaps_, and _radix trees_.
+
+These allowed the impressive testing performance seen below.
 
 #### Test 1
 ![Messages Image(571780674)](/assets/Messages%20Image(571780674).png)
+_Note: These tests were performed on a MacBook Pro, while in a Zoom call and running lots of other apps. This test is primitive and should be no indication of full performance capabilities._
