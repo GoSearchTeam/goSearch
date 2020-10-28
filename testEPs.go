@@ -2,8 +2,6 @@ package main
 
 import (
 	"github.com/gin-gonic/gin"
-	"io/ioutil"
-	"log"
 )
 
 func HandleTestRoutes(r *gin.Engine) {
