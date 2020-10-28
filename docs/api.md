@@ -2,6 +2,10 @@
 
 ## /index/listItems
 
+**Request Type**: hh
+
+**Received**:
+
 ## /index/listIndexes
 
 ## /index/search
