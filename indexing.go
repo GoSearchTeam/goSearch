@@ -75,7 +75,7 @@ func LoadIndexesFromDisk(app *appIndexes) { // TODO: Change to search folders an
 	}
 	filepath.Walk(fmt.Sprintf("./serialized/%s", app.name), func(path string, info os.FileInfo, err error) error {
 		if info == nil {
-			fmt.Println("Error: ./serialized/%s does not exist", app.name)
+			fmt.Printf("Error: ./serialized/%s does not exist\n", app.name)
 			return nil
 		}
 		if info.IsDir() {
