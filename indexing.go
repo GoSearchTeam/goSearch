@@ -310,7 +310,7 @@ func (appindex *appIndexes) deleteIndex(docID uint64) error {
 	// Find document on disk
 	docPath := fmt.Sprintf("./documents/%v", docID)
 	if _, err := os.Stat(docPath); os.IsNotExist(err) {
-		log.Printf("Error: DocID: %v does not exist\n", docID)
+		log.Printf("DocID: %v does not exist\n", docID)
 		return err
 	}
 	docData, err := ioutil.ReadFile(docPath)
@@ -366,21 +366,24 @@ func (appindex *appIndexes) deleteIndex(docID uint64) error {
 	return nil
 }
 
-func (appindex *appIndexes) updateIndex(parsed map[string]interface{}) error {
+func (appindex *appIndexes) updateIndex(parsed map[string]interface{}) (errrr error, created bool) {
 	var err error = nil
 	// Validate docID
 	var docID uint64
 	pre, err := parsed["docID"].(json.Number).Int64()
 	docID = uint64(pre)
 	if err != nil {
-		return err
+		return err, false
 	}
 	err = appindex.deleteIndex(docID)
-	if err != nil {
-		return err
+	if os.IsNotExist(err) {
+		appindex.addIndex(parsed)
+		err = nil
+		return err, true
+	} else if err == nil {
+		appindex.addIndex(parsed)
 	}
-	appindex.addIndex(parsed)
-	return err
+	return err, false
 }
 
 func FuzzySearch(key string, t *radix.Tree) []fuzzyItem {
