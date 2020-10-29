@@ -61,17 +61,17 @@ func lowercaseTokens(tokens []string) []string {
 
 func CheckDocumentsFolder() {
 	if _, err := os.Stat("./documents"); os.IsNotExist(err) {
-		os.Mkdir("./documents", os.ModePerm)
+		os.Mkdir("./documents", os.FileMode(0755))
 	}
 }
 
 func LoadIndexesFromDisk(app *appIndexes) { // TODO: Change to search folders and load based on app
 	start := time.Now()
 	if _, err := os.Stat("./serialized"); os.IsNotExist(err) { // Make sure serialized folder exists
-		os.Mkdir("./serialized", os.ModePerm)
+		os.Mkdir("./serialized", os.FileMode(0755))
 	}
 	if _, err := os.Stat(fmt.Sprintf("./serialized/%s", app.name)); os.IsNotExist(err) { // Make sure app folder exists
-		os.Mkdir(fmt.Sprintf("./serialized/%s", app.name), os.ModePerm)
+		os.Mkdir(fmt.Sprintf("./serialized/%s", app.name), os.FileMode(0755))
 	}
 	filepath.Walk(fmt.Sprintf("./serialized/%s", app.name), func(path string, info os.FileInfo, err error) error {
 		if info == nil {
@@ -283,10 +283,10 @@ func (appindex *appIndexes) searchByField(input string, field string, bw bool) (
 func (appindex *appIndexes) SerializeIndex() {
 	log.Printf("### Serializing %s Index...\n", appindex.name)
 	if _, err := os.Stat("./serialized"); os.IsNotExist(err) { // Make sure serialized folder exists
-		os.Mkdir("./serialized", os.ModePerm)
+		os.Mkdir("./serialized", os.FileMode(0755))
 	}
 	if _, err := os.Stat(fmt.Sprintf("./serialized/%s", appindex.name)); os.IsNotExist(err) { // Make sure app folder exists
-		os.Mkdir(fmt.Sprintf("./serialized/%s", appindex.name), os.ModePerm)
+		os.Mkdir(fmt.Sprintf("./serialized/%s", appindex.name), os.FileMode(0755))
 	}
 	for _, i := range appindex.indexes {
 		serializedTree := i.index.ToMap()
