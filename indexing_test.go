@@ -50,16 +50,8 @@ func TestSmallSearch(t *testing.T) {
 	}
 }
 
-func TestFieldSearch(t *testing.T) {
-	app := initApp("TestFieldSearch")
-	benData := `{"name":"Ben","age":21,"food":"burgers"}`
-	// jimmyData := `{"name":"Jimmy","age":21,"food":"pizza"}`
-	// alexData := `{"name":"Alex","age":22,"food":"pizza"}`
+func TestFullCURD(t *testing.T) {
 
-	benParsed, _ := parseArbJSON(benData)
-
-	benID := app.addIndex(benParsed)
-	t.Log(benID)
 }
 
 func documentsCleanup(docs []uint64) {
