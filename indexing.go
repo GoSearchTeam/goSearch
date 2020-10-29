@@ -4,8 +4,6 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
-	"github.com/RoaringBitmap/roaring/roaring64"
-	"github.com/armon/go-radix"
 	"io/ioutil"
 	"log"
 	"math/rand"
@@ -14,6 +12,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/RoaringBitmap/roaring/roaring64"
+	"github.com/armon/go-radix"
 )
 
 type indexMap struct {
@@ -339,10 +340,17 @@ func (appindex *appIndexes) deleteIndex(docID uint64) error {
 						node := prenode.(*roaring64.Bitmap)
 						node.Remove(docID)
 						ids = node
-						_, updated := indexmap.index.Insert(token, ids)
-						if !updated {
-							log.Printf("### SOMEHOW DIDN'T UPDATE WHEN DELETING INDEX ###\n")
-							continue
+						if node.IsEmpty() {
+							_, deleted := indexmap.index.Delete(token) // this should delete the node if it is empty
+							if !deleted {
+								log.Printf("Node was not deleted\n")
+							}
+						} else {
+							_, updated := indexmap.index.Insert(token, ids)
+							if !updated {
+								log.Printf("### SOMEHOW DIDN'T UPDATE WHEN DELETING INDEX ###\n")
+								continue
+							}
 						}
 					}
 				}
