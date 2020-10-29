@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"io/ioutil"
 	"log"
+
+	"github.com/gin-gonic/gin"
 )
 
 type QueryBody struct {
@@ -119,7 +120,8 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 		}
 		err := app.updateIndex(jDat)
 		if err != nil {
-			c.String(500, "Internal Error, check logs")
+			log.Printf("%v\n", err)
+			c.String(500, fmt.Sprintf("Internal Error: %v", err))
 		} else {
 			c.String(200, "Updated Index")
 		}
