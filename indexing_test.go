@@ -50,7 +50,70 @@ func TestSmallSearch(t *testing.T) {
 	}
 }
 
-func TestFullCURD(t *testing.T) {
+func TestUpdate(t *testing.T) {
+	app := initApp("TestFullCRUD")
+	data, _ := parseArbJSON(`{
+		"index":"value"
+	}`)
+
+	docID := app.addIndex(data)
+
+	uStr := fmt.Sprintf(`{
+		"docID":%v,
+		"index2":"value2"
+	}`, docID)
+	uData, _ := parseArbJSON(uStr)
+	app.updateIndex(uData)
+	updatedID, updatedData := app.search("value2", []string{"index2"}, false)
+	if updatedID[0] != docID {
+		t.Error("UPDATE: IDs dont match")
+	}
+	if updatedData[0] != `{"index2":"value2"}` {
+		t.Error("UPDATE: Data doesnt match")
+	}
+
+	documentsCleanup([]uint64{docID})
+}
+
+func TestFullCRUD(t *testing.T) {
+	app := initApp("TestFullCRUD")
+	data, _ := parseArbJSON(`{
+		"index":"value"
+	}`)
+
+	docID := app.addIndex(data)
+	doc := fmt.Sprintf("./documents/%d", docID)
+	if _, err := os.Stat(doc); os.IsNotExist(err) {
+		t.Error("Document not created")
+	}
+
+	searchedID, searchedData := app.search("value", []string{"index"}, false)
+	if searchedID[0] != docID {
+		t.Error("SEARCH: IDs dont match")
+	}
+	if searchedData[0] != `{"index":"value"}` {
+		t.Error("SEARCH: Data doesnt match")
+	}
+
+	uStr := fmt.Sprintf(`{
+		"docID":%v,
+		"index2":"value2"
+	}`, docID)
+	uData, _ := parseArbJSON(uStr)
+	app.updateIndex(uData)
+	updatedID, updatedData := app.search("value2", []string{"index2"}, false)
+	if updatedID[0] != docID {
+		t.Error("UPDATE: IDs dont match")
+	}
+	if updatedData[0] != `{"index2":"value2"}` {
+		t.Error("UPDATE: Data doesnt match")
+	}
+
+	app.deleteIndex(docID)
+	if _, err := os.Stat(doc); os.IsExist(err) {
+		t.Error("DELETE: Document still on disk")
+		documentsCleanup([]uint64{docID})
+	}
 
 }
 
