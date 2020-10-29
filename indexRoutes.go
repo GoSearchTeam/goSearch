@@ -3,10 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"io/ioutil"
 	"log"
-
-	"github.com/gin-gonic/gin"
 )
 
 type QueryBody struct {
