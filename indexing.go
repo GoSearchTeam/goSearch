@@ -322,7 +322,7 @@ func (appindex *appIndexes) deleteIndex(docID uint64) error {
 	for k, v := range docJSON {
 		// Don't index ID
 		input := fmt.Sprintf("%v", v)
-		if strings.ToLower(k) == "docid" {
+		if k == "docID" {
 			continue
 		}
 		// Find the field index
