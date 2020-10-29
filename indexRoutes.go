@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"io/ioutil"
+	"log"
 )
 
 type QueryBody struct {
@@ -19,6 +21,14 @@ type SearchResponse struct {
 
 type AddMultipleIndex struct {
 	Items []map[string]interface{} `json:"items"`
+}
+
+type DeleteDocumentRequestBody struct {
+	DocID uint64 `json:"docID"`
+}
+
+type UpdateDocumentRequestBody struct {
+	DocID uint64 `json:"docID"`
 }
 
 func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
@@ -67,23 +77,51 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 	r.POST("/index/add", func(c *gin.Context) {
 		data, _ := ioutil.ReadAll(c.Request.Body)
 		jDat, _ := parseArbJSON(string(data))
-		app.addIndex(jDat)
-		// for k, v := range jDat {
-		// 	log.Printf("Key: %s Value: %s\n", k, v)
-		// }
-		c.String(200, "Added Index")
+		docID := app.addIndex(jDat)
+		c.JSON(200, gin.H{
+			"msg":   "Added Index",
+			"docID": docID,
+		})
 	})
 
 	r.POST("/index/addMultiple", func(c *gin.Context) {
 		data, _ := ioutil.ReadAll(c.Request.Body)
 		jDat := AddMultipleIndex{}
 		json.Unmarshal([]byte(data), &jDat)
+		docIDs := make([]uint64, 0)
 		for _, item := range jDat.Items {
-			app.addIndex(item)
+			docIDs = append(docIDs, app.addIndex(item))
 		}
-		// for k, v := range jDat {
-		// 	log.Printf("Key: %s Value: %s\n", k, v)
-		// }
-		c.String(200, "Added Indexes")
+		c.JSON(200, gin.H{
+			"msg":    "Added Indexes",
+			"docIDs": docIDs,
+		})
+	})
+
+	r.POST("/index/delete", func(c *gin.Context) {
+		body := DeleteDocumentRequestBody{}
+		c.BindJSON(&body)
+		err := app.deleteIndex(body.DocID)
+		if err != nil {
+			log.Printf("%v\n", err)
+			c.String(500, fmt.Sprintf("Internal Error: %v", err))
+		} else {
+			c.String(200, fmt.Sprintf("Deleted document %v", body.DocID))
+		}
+	})
+
+	r.POST("/index/update", func(c *gin.Context) {
+		d := json.NewDecoder(c.Request.Body)
+		d.UseNumber()
+		var jDat map[string]interface{}
+		if err := d.Decode(&jDat); err != nil {
+			log.Fatal(err)
+		}
+		err := app.updateIndex(jDat)
+		if err != nil {
+			c.String(500, "Internal Error, check logs")
+		} else {
+			c.String(200, "Updated Index")
+		}
 	})
 }
