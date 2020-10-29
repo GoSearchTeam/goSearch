@@ -175,7 +175,7 @@ func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, file
 	// Write indexes document to disk
 	fmt.Sprintf("Writing out to: %s\n", fmt.Sprintf("./documents/%v", id))
 	sendback, _ := stringIndex(parsed)
-	ioutil.WriteFile(fmt.Sprintf("./documents/%v", id), []byte(sendback), os.ModePerm)
+	ioutil.WriteFile(fmt.Sprintf("./documents/%v", id), []byte(sendback), os.FileMode(0660))
 	return id
 
 	// TODO: Store document
@@ -222,7 +222,7 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 	// Write indexes document to disk
 	fmt.Sprintf("Writing out to: %s\n", fmt.Sprintf("./documents/%v", id))
 	sendback, _ := stringIndex(parsed)
-	ioutil.WriteFile(fmt.Sprintf("./documents/%v", id), []byte(sendback), os.ModePerm)
+	ioutil.WriteFile(fmt.Sprintf("./documents/%v", id), []byte(sendback), os.FileMode(0660))
 	return id
 
 	// TODO: Store document

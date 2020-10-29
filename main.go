@@ -9,6 +9,7 @@ import (
 )
 
 func main() {
+	syscall.Umask(0) // file mode perms
 	logFile, _ := os.OpenFile("logs.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0777)
 	mw := io.MultiWriter(os.Stdout, logFile)
 	log.SetOutput(mw)
