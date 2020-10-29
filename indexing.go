@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/gob"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -60,17 +61,17 @@ func lowercaseTokens(tokens []string) []string {
 
 func CheckDocumentsFolder() {
 	if _, err := os.Stat("./documents"); os.IsNotExist(err) {
-		os.Mkdir("./documents", os.ModePerm)
+		os.Mkdir("./documents", os.FileMode(0755))
 	}
 }
 
 func LoadIndexesFromDisk(app *appIndexes) { // TODO: Change to search folders and load based on app
 	start := time.Now()
 	if _, err := os.Stat("./serialized"); os.IsNotExist(err) { // Make sure serialized folder exists
-		os.Mkdir("./serialized", os.ModePerm)
+		os.Mkdir("./serialized", os.FileMode(0755))
 	}
 	if _, err := os.Stat(fmt.Sprintf("./serialized/%s", app.name)); os.IsNotExist(err) { // Make sure app folder exists
-		os.Mkdir(fmt.Sprintf("./serialized/%s", app.name), os.ModePerm)
+		os.Mkdir(fmt.Sprintf("./serialized/%s", app.name), os.FileMode(0755))
 	}
 	filepath.Walk(fmt.Sprintf("./serialized/%s", app.name), func(path string, info os.FileInfo, err error) error {
 		if info == nil {
@@ -151,7 +152,7 @@ func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, file
 	// log.Println("### ID:", id)
 	for k, v := range parsed {
 		// Don't index ID
-		if strings.ToLower(k) == "id" {
+		if strings.ToLower(k) == "docid" {
 			continue
 		}
 		// Find if indexMap already exists
@@ -174,7 +175,7 @@ func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, file
 	// Write indexes document to disk
 	fmt.Sprintf("Writing out to: %s\n", fmt.Sprintf("./documents/%v", id))
 	sendback, _ := stringIndex(parsed)
-	ioutil.WriteFile(fmt.Sprintf("./documents/%v", id), []byte(sendback), os.ModePerm)
+	ioutil.WriteFile(fmt.Sprintf("./documents/%v", id), []byte(sendback), os.FileMode(0660))
 	return id
 
 	// TODO: Store document
@@ -186,11 +187,17 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 	// log.Println("### Adding index...")
 	// Format the input
 	rand.Seed(time.Now().UnixNano())
-	id := rand.Uint64()
+	var id uint64
+	if parsed["docID"] != nil {
+		pre, _ := parsed["docID"].(json.Number).Int64()
+		id = uint64(pre)
+	} else {
+		id = rand.Uint64()
+	}
 	// log.Println("### ID:", id)
 	for k, v := range parsed {
 		// Don't index ID
-		if strings.ToLower(k) == "id" {
+		if strings.ToLower(k) == "docid" {
 			continue
 		}
 		// Find if indexMap already exists
@@ -210,10 +217,12 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 		// Add index to indexMap
 		indexMapPointer.addIndex(id, fmt.Sprintf("%v", v))
 	}
+	// Remove docID field
+	delete(parsed, "docID")
 	// Write indexes document to disk
 	fmt.Sprintf("Writing out to: %s\n", fmt.Sprintf("./documents/%v", id))
 	sendback, _ := stringIndex(parsed)
-	ioutil.WriteFile(fmt.Sprintf("./documents/%v", id), []byte(sendback), os.ModePerm)
+	ioutil.WriteFile(fmt.Sprintf("./documents/%v", id), []byte(sendback), os.FileMode(0660))
 	return id
 
 	// TODO: Store document
@@ -274,10 +283,10 @@ func (appindex *appIndexes) searchByField(input string, field string, bw bool) (
 func (appindex *appIndexes) SerializeIndex() {
 	log.Printf("### Serializing %s Index...\n", appindex.name)
 	if _, err := os.Stat("./serialized"); os.IsNotExist(err) { // Make sure serialized folder exists
-		os.Mkdir("./serialized", os.ModePerm)
+		os.Mkdir("./serialized", os.FileMode(0755))
 	}
 	if _, err := os.Stat(fmt.Sprintf("./serialized/%s", appindex.name)); os.IsNotExist(err) { // Make sure app folder exists
-		os.Mkdir(fmt.Sprintf("./serialized/%s", appindex.name), os.ModePerm)
+		os.Mkdir(fmt.Sprintf("./serialized/%s", appindex.name), os.FileMode(0755))
 	}
 	for _, i := range appindex.indexes {
 		serializedTree := i.index.ToMap()
@@ -296,7 +305,84 @@ func (appindex *appIndexes) SerializeIndex() {
 	log.Printf("### Successfully Serialized %s Index!\n", appindex.name)
 }
 
-// FuzzySearch performs a fuzzy search on a given tree - WARNING: FAR LESS EFFICIENT
+func (appindex *appIndexes) deleteIndex(docID uint64) error {
+	var err error = nil
+	// Find document on disk
+	docPath := fmt.Sprintf("./documents/%v", docID)
+	if _, err := os.Stat(docPath); os.IsNotExist(err) {
+		log.Printf("Error: DocID: %v does not exist\n", docID)
+		return err
+	}
+	docData, err := ioutil.ReadFile(docPath)
+	docString := string(docData)
+	docJSON, err := parseArbJSON(docString)
+	if err != nil {
+		return err
+	}
+	for k, v := range docJSON {
+		// Don't index ID
+		input := fmt.Sprintf("%v", v)
+		if k == "docID" {
+			continue
+		}
+		// Find the field index
+		for i := 0; i < len(appindex.indexes); i++ {
+			if k == appindex.indexes[i].field {
+				indexmap := appindex.indexes[i]
+				// Tokenize field
+				for _, token := range lowercaseTokens(tokenizeString(input)) {
+					prenode, _ := indexmap.index.Get(token)
+					var ids *roaring64.Bitmap
+					if prenode == nil { // somehow not indexed
+						log.Printf("### Error: field not indexes from disk document (deleteIndex)")
+						continue
+					} else { // update node
+						node := prenode.(*roaring64.Bitmap)
+						node.Remove(docID)
+						ids = node
+						if node.IsEmpty() {
+							_, deleted := indexmap.index.Delete(token) // this should delete the node if it is empty
+							if !deleted {
+								log.Printf("Node was not deleted\n")
+							}
+						} else {
+							_, updated := indexmap.index.Insert(token, ids)
+							if !updated {
+								log.Printf("### SOMEHOW DIDN'T UPDATE WHEN DELETING INDEX ###\n")
+								continue
+							}
+						}
+					}
+				}
+				break
+			}
+		}
+	}
+	// Delete document on disk
+	err = os.Remove(docPath)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (appindex *appIndexes) updateIndex(parsed map[string]interface{}) error {
+	var err error = nil
+	// Validate docID
+	var docID uint64
+	pre, err := parsed["docID"].(json.Number).Int64()
+	docID = uint64(pre)
+	if err != nil {
+		return err
+	}
+	err = appindex.deleteIndex(docID)
+	if err != nil {
+		return err
+	}
+	appindex.addIndex(parsed)
+	return err
+}
+
 func FuzzySearch(key string, t *radix.Tree) []fuzzyItem {
 	output := make([]fuzzyItem, 0)
 	split := strings.Split(key, "")
