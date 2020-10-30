@@ -11,9 +11,7 @@ import (
 func TestAddIndex(t *testing.T) {
 	app := initApp("TestAddIndex")
 	data, _ := parseArbJSON(`{
-		"name": "Test",
-		"food": "Tacos",
-		"time": "High noon"
+		"index": "Test Add"
 	}`)
 	id := app.addIndex(data)
 
@@ -28,7 +26,7 @@ func TestAddIndex(t *testing.T) {
 func TestDeleteIndex(t *testing.T) {
 	app := initApp("TestDeleteIndex")
 	data, _ := parseArbJSON(`{
-		"index":"value"	
+		"index":"Test Delete"	
 	}`)
 
 	docID := app.addIndex(data)
@@ -72,17 +70,17 @@ func TestSmallSearch(t *testing.T) {
 	}
 }
 
-func TestUpdate(t *testing.T) {
-	app := initApp("TestFullCRUD")
+func TestUpdateIndex(t *testing.T) {
+	app := initApp("TestUpdateIndex")
 	data, _ := parseArbJSON(`{
-		"index":"value"
+		"index":"Test Update"
 	}`)
 
 	docID := app.addIndex(data)
 
 	d := json.NewDecoder(strings.NewReader(fmt.Sprintf(`{
 		"docID":%v,
-		"index2":"value2"
+		"index2":"Test Update 2"
 	}`, docID)))
 	d.UseNumber()
 	var uData map[string]interface{}
@@ -91,7 +89,7 @@ func TestUpdate(t *testing.T) {
 	}
 
 	app.updateIndex(uData)
-	updatedID, updatedData := app.search("value2", []string{"index2"}, false)
+	updatedID, updatedData := app.search("Test Update 2", []string{"index2"}, false)
 
 	if len(updatedID) != 1 || len(updatedData) != 1 {
 		t.Error("Search returned wrong number of results")
@@ -109,7 +107,7 @@ func TestUpdate(t *testing.T) {
 func TestFullCRUD(t *testing.T) {
 	app := initApp("TestFullCRUD")
 	data, _ := parseArbJSON(`{
-		"index":"value"
+		"index":"Full CRUD"
 	}`)
 
 	docID := app.addIndex(data)
@@ -118,7 +116,7 @@ func TestFullCRUD(t *testing.T) {
 		t.Error("Document not created")
 	}
 
-	searchedID, searchedData := app.search("value", []string{"index"}, false)
+	searchedID, searchedData := app.search("Full CRUD", []string{"index"}, false)
 
 	if len(searchedID) != 1 || len(searchedData) != 1 {
 		t.Error("SEARCH: returned incorrect number of results")
@@ -126,13 +124,13 @@ func TestFullCRUD(t *testing.T) {
 	if searchedID[0] != docID {
 		t.Error("SEARCH: IDs dont match")
 	}
-	if searchedData[0] != `{"index":"value"}` {
+	if searchedData[0] != `{"index":"Full CRUD"}` {
 		t.Error("SEARCH: Data doesnt match")
 	}
 
 	d := json.NewDecoder(strings.NewReader(fmt.Sprintf(`{
 		"docID":%v,
-		"index2":"value2"
+		"index2":"Full CRUD 2"
 	}`, docID)))
 	d.UseNumber()
 	var uData map[string]interface{}
@@ -141,15 +139,15 @@ func TestFullCRUD(t *testing.T) {
 	}
 
 	app.updateIndex(uData)
-	updatedID, updatedData := app.search("value2", []string{"index2"}, false)
+	updatedID, updatedData := app.search("value2", []string{"Full CRUD 2"}, false)
 
 	if len(updatedID) != 1 || len(updatedData) != 1 {
-		t.Error("UPDATE: search returned wrong number of results")
+		t.Error("UPDATE: search returned incorrect number of results")
 	}
 	if updatedID[0] != docID {
 		t.Error("UPDATE: IDs dont match")
 	}
-	if updatedData[0] != `{"index2":"value2"}` {
+	if updatedData[0] != `{"index2":"Full CRUD 2"}` {
 		t.Error("UPDATE: Data doesnt match")
 	}
 
