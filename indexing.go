@@ -37,6 +37,12 @@ type listItem struct {
 	IndexValues []string
 }
 
+type DocumentObject struct {
+	Score float64                `json:"score"`
+	Data  map[string]interface{} `json:"data"`
+	DocID uint64                 `json:"docID"`
+}
+
 func initApp(name string) *appIndexes {
 	appindex := appIndexes{make([]indexMap, 0), name}
 	return &appindex
@@ -106,9 +112,20 @@ func LoadIndexesFromDisk(app *appIndexes) { // TODO: Change to search folders an
 }
 
 func fetchDocument(docID uint64) string {
-	// TODO: Optimize to maybe not load this all into memory?
 	dat, _ := ioutil.ReadFile(fmt.Sprintf("./documents/%v", docID))
 	return string(dat)
+}
+
+func scoreDocuments(docObjs *[]DocumentObject, tokens []string) {
+	for _, docObj := range *docObjs {
+		// Determine precision of document
+		// Determine recall of document
+		docString := fetchDocument(docObj.DocID)
+		for _, token := range tokens {
+
+		}
+	}
+	// Sort by rank and keep 100 most accurate documents
 }
 
 // ########################################################################
@@ -230,11 +247,11 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 
 }
 
-func (appindex *appIndexes) search(input string, fields []string, bw bool) (documentIDs []uint64, documents []string) {
+func (appindex *appIndexes) search(input string, fields []string, bw bool) (documentIDs []uint64, documents []DocumentObject) {
 	var output []uint64
-	docs := make([]string, 0)
 	// Tokenize input
-	for _, token := range lowercaseTokens(tokenizeString(input)) {
+	searchTokens := lowercaseTokens(tokenizeString(input))
+	for _, token := range searchTokens {
 		// Check fields
 		if len(fields) == 0 { // check all
 			// log.Println("### No fields given, searching all fields...")
@@ -258,10 +275,24 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 			}
 		}
 	}
+	// Frequency Rank and Sort
+	finalDocs := make([]DocumentObject, 0)
+	// Get appearance frequency
+	freqMap := make(map[uint64]int)
 	for _, docID := range output {
-		docs = append(docs, fetchDocument(docID))
+		freqMap[docID] = freqMap[docID] + 1
 	}
-	return output, docs
+	// Give rank to frequency
+	for docID, freq := range freqMap {
+		finalDocs = append(finalDocs, DocumentObject{
+			Data:  nil,
+			Score: float64(freq) / float64(len(output)),
+			DocID: docID,
+		})
+	}
+	// Further Ranking
+	scoreDocuments(&finalDocs, searchTokens)
+	return output, finalDocs
 }
 
 func (appindex *appIndexes) searchByField(input string, field string, bw bool) (documentIDs []uint64) {
