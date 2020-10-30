@@ -10,7 +10,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -28,9 +27,8 @@ var jwts []jwt.Token
 var jwtSecret string = "thisisanexamplesecret"
 
 type WebsocketResponse struct {
-	TimeNS    int64    `json:"timeNS"`
-	DocIDs    string   `json:"docIDs"`
-	Documents []string `json:"documents"`
+	TimeNS    int64            `json:"timeNS"`
+	Documents []DocumentObject `json:"documents"`
 }
 
 type WebsocketAuthValidResponse struct {
@@ -77,20 +75,21 @@ func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, c *gin.Context, 
 		flatJSON, _ := parseArbJSON(string(msg))
 		body := QueryBody{BeginsWith: false}
 		var output []uint64
-		documents := make([]string, 0)
+		documents := make([]DocumentObject, 0)
+		var responseJSON SearchResponse
+		fmt.Println(responseJSON)
+		var res []uint64
 		if flatJSON["query"] != nil {
 			json.Unmarshal(msg, &body)
 			query := body.Query
 			fields := body.Fields
 			bw := body.BeginsWith
 			if fields != nil { // Field(s) specified
-				res, docs := app.search(query, fields, bw)
+				res, responseJSON = app.search(query, fields, bw)
 				output = append(output, res...)
-				documents = append(documents, docs...)
 			} else {
-				res, docs := app.search(query, make([]string, 0), bw)
+				res, responseJSON = app.search(query, make([]string, 0), bw)
 				output = append(output, res...) // TODO: Send documents as well
-				documents = append(documents, docs...)
 			}
 			// Convert to array of strings
 			out2 := make([]string, len(output))
@@ -98,10 +97,9 @@ func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, c *gin.Context, 
 				//fmt.Sprintf("%d", item);
 				out2 = append(out2, fmt.Sprintf("%v", item))
 			}
-			out3 := strings.Trim(strings.Join(strings.Fields(fmt.Sprint(output)), ","), "[]")
+			// out3 := strings.Trim(strings.Join(strings.Fields(fmt.Sprint(output)), ","), "[]")
 			end := time.Now()
 			resStruct := &WebsocketResponse{
-				DocIDs:    out3,
 				TimeNS:    end.Sub(start).Nanoseconds(),
 				Documents: documents,
 			}

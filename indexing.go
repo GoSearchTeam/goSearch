@@ -4,17 +4,17 @@ import (
 	"encoding/gob"
 	"encoding/json"
 	"fmt"
+	"github.com/RoaringBitmap/roaring/roaring64"
+	"github.com/armon/go-radix"
 	"io/ioutil"
 	"log"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/RoaringBitmap/roaring/roaring64"
-	"github.com/armon/go-radix"
 )
 
 type indexMap struct {
@@ -41,6 +41,12 @@ type DocumentObject struct {
 	Score float64                `json:"score"`
 	Data  map[string]interface{} `json:"data"`
 	DocID uint64                 `json:"docID"`
+}
+
+type SearchResponse struct {
+	Items      []DocumentObject `json:"items"`
+	SearchTime time.Duration    `json:"searchTimeNS"`
+	ScoreTime  time.Duration    `json:"scoreTimeNS"`
 }
 
 func initApp(name string) *appIndexes {
@@ -116,14 +122,29 @@ func fetchDocument(docID uint64) string {
 	return string(dat)
 }
 
-func scoreDocuments(docObjs *[]DocumentObject, tokens []string) {
-	for _, docObj := range *docObjs {
+func scoreDocuments(docObjs *SearchResponse, tokens []string) {
+	for idx, docObj := range docObjs.Items {
 		// Determine precision of document
 		// Determine recall of document
 		docString := fetchDocument(docObj.DocID)
-		for _, token := range tokens {
-
+		recallFreq := 0
+		for _, token := range tokens { // TODO: lower weight of common words (e.g. if, the, a) (idf - inverse document frequency IDF(w)= log (N/df(w)) , TF (w) * IDF(w) ,  TF(w)*IDF(w)/len(d)  )
+			// ^^^ The more documents contain a token, the less important that token is (lower score)
+			// Precision score
+			tokenFreq := strings.Count(docString, token)
+			if tokenFreq > 0 {
+				recallFreq++
+			}
+			totalLen := len(strings.Fields(docString))
+			moreScore := float64(tokenFreq) / float64(totalLen)
+			docObjs.Items[idx].Score += moreScore
 		}
+		// Recall score
+		docObjs.Items[idx].Score += float64(recallFreq) / float64(len(tokens))
+		// TODO: optimize when to do this
+		// Load document content
+		docObjs.Items[idx].Data, _ = parseArbJSON(docString)
+		fmt.Println(docObj)
 	}
 	// Sort by rank and keep 100 most accurate documents
 }
@@ -247,9 +268,10 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 
 }
 
-func (appindex *appIndexes) search(input string, fields []string, bw bool) (documentIDs []uint64, documents []DocumentObject) {
+func (appindex *appIndexes) search(input string, fields []string, bw bool) (documentIDs []uint64, response SearchResponse) {
 	var output []uint64
 	// Tokenize input
+	start := time.Now()
 	searchTokens := lowercaseTokens(tokenizeString(input))
 	for _, token := range searchTokens {
 		// Check fields
@@ -275,24 +297,40 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 			}
 		}
 	}
-	// Frequency Rank and Sort
-	finalDocs := make([]DocumentObject, 0)
+	responseObj := SearchResponse{
+		Items: make([]DocumentObject, 0),
+	}
+	end := time.Now()
+	diff := end.Sub(start)
+	responseObj.SearchTime = diff
+	// Frequency Score and Sort
 	// Get appearance frequency
+	start = time.Now()
 	freqMap := make(map[uint64]int)
 	for _, docID := range output {
 		freqMap[docID] = freqMap[docID] + 1
 	}
-	// Give rank to frequency
+	// Give Score to frequency
 	for docID, freq := range freqMap {
-		finalDocs = append(finalDocs, DocumentObject{
+		responseObj.Items = append(responseObj.Items, DocumentObject{
 			Data:  nil,
 			Score: float64(freq) / float64(len(output)),
 			DocID: docID,
 		})
 	}
-	// Further Ranking
-	scoreDocuments(&finalDocs, searchTokens)
-	return output, finalDocs
+	sort.Slice(responseObj.Items, func(i int, j int) bool {
+		return responseObj.Items[i].Score > responseObj.Items[j].Score
+	})
+	// TODO: Only take first 100 documents for now
+	if len(responseObj.Items) > 100 {
+		responseObj.Items = responseObj.Items[:100]
+	}
+	fmt.Println("sort", responseObj.Items)
+	// Further Scoring
+	scoreDocuments(&responseObj, searchTokens)
+	end = time.Now()
+	responseObj.ScoreTime = end.Sub(start)
+	return output, responseObj
 }
 
 func (appindex *appIndexes) searchByField(input string, field string, bw bool) (documentIDs []uint64) {
