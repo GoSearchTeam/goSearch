@@ -117,10 +117,12 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 		if err := d.Decode(&jDat); err != nil {
 			log.Fatal(err)
 		}
-		err := app.updateIndex(jDat)
+		err, created := app.updateIndex(jDat)
 		if err != nil {
-			log.Printf("%v\n", err)
-			c.String(500, fmt.Sprintf("Internal Error: %v", err))
+			log.Println("Error:", err)
+			c.String(500, "Internal Error, check logs")
+		} else if created {
+			c.String(200, "Created new Index")
 		} else {
 			c.String(200, "Updated Index")
 		}
