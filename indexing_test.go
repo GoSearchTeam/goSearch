@@ -25,6 +25,24 @@ func TestAddIndex(t *testing.T) {
 	documentsCleanup(ids)
 }
 
+func TestDeleteIndex(t *testing.T) {
+	app := initApp("TestDeleteIndex")
+	data, _ := parseArbJSON(`{
+		"index":"value"	
+	}`)
+
+	docID := app.addIndex(data)
+	doc := fmt.Sprintf("./documents/%d", docID)
+	err := app.deleteIndex(docID)
+
+	if err != nil {
+		t.Errorf("Delete failed:\n%v", err)
+	}
+	if _, err := os.Stat(doc); os.IsExist(err) {
+		t.Error("Document still exists on disk")
+	}
+}
+
 func TestSmallSearch(t *testing.T) {
 	app := initApp("TestSmallSearch")
 	fields := []string{"name"}
