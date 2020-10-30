@@ -1,8 +1,10 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -58,11 +60,16 @@ func TestUpdate(t *testing.T) {
 
 	docID := app.addIndex(data)
 
-	uStr := fmt.Sprintf(`{
+	d := json.NewDecoder(strings.NewReader(fmt.Sprintf(`{
 		"docID":%v,
 		"index2":"value2"
-	}`, docID)
-	uData, _ := parseArbJSON(uStr)
+	}`, docID)))
+	d.UseNumber()
+	var uData map[string]interface{}
+	if err := d.Decode(&uData); err != nil {
+		t.Error(err)
+	}
+
 	app.updateIndex(uData)
 	updatedID, updatedData := app.search("value2", []string{"index2"}, false)
 	if updatedID[0] != docID {
@@ -95,13 +102,22 @@ func TestFullCRUD(t *testing.T) {
 		t.Error("SEARCH: Data doesnt match")
 	}
 
-	uStr := fmt.Sprintf(`{
+	d := json.NewDecoder(strings.NewReader(fmt.Sprintf(`{
 		"docID":%v,
 		"index2":"value2"
-	}`, docID)
-	uData, _ := parseArbJSON(uStr)
+	}`, docID)))
+	d.UseNumber()
+	var uData map[string]interface{}
+	if err := d.Decode(&uData); err != nil {
+		t.Error(err)
+	}
+
 	app.updateIndex(uData)
 	updatedID, updatedData := app.search("value2", []string{"index2"}, false)
+
+	if len(updatedID) != 1 || len(updatedData) != 1 {
+		t.Error("UPDATE: search returned wrong number of results")
+	}
 	if updatedID[0] != docID {
 		t.Error("UPDATE: IDs dont match")
 	}
@@ -114,7 +130,6 @@ func TestFullCRUD(t *testing.T) {
 		t.Error("DELETE: Document still on disk")
 		documentsCleanup([]uint64{docID})
 	}
-
 }
 
 func documentsCleanup(docs []uint64) {
