@@ -164,21 +164,37 @@ func scoreDocuments(docObjs *SearchResponse, tokens []string) {
 		// uniqueTokens := make(map[string]string)
 		for _, token := range tokens { // TODO: lower weight of common words (e.g. if, the, a) (idf - inverse document frequency IDF(w)= log (N/df(w)) , TF (w) * IDF(w) ,  TF(w)*IDF(w)/len(d)  )
 			// ^^^ The more documents contain a token, the less important that token is (lower score)
-			// Precision score
-			tokenFreq := strings.Count(docString, token)
-			if tokenFreq > 0 {
+			// Precision score - how much of the search term is the document
+			// Substring match
+			tokenSubFreq := strings.Count(strings.ToLower(docString), token)
+
+			// BEGIN Precision word match
+			tokenPrecisionFreq := 0
+			docStringWord := strings.FieldsFunc(docString, func(r rune) bool {
+				return r == ' ' || r == '"'
+			})
+			for _, word := range docStringWord {
+				if strings.ToLower(word) == token {
+					tokenPrecisionFreq++
+				}
+			}
+			tfPrecisionWeightedScore := 1 + math.Log(1+math.Log(1+float64(tokenPrecisionFreq)))
+			docObjs.Items[idx].Score += tfPrecisionWeightedScore
+			// END Precision word match
+
+			if tokenSubFreq > 0 {
 				recallFreq++
 			}
-			totalDocLen := len(strings.Fields(docString))
-			moreScore := float64(tokenFreq) / float64(totalDocLen)
-			docObjs.Items[idx].Score += moreScore
+
+			// totalDocLen := len(strings.Fields(docString))
+			tfWeightedScore := 1 + math.Log(1+math.Log(1+float64(tokenSubFreq)))
+			docObjs.Items[idx].Score += tfWeightedScore
 		}
-		// Recall score
+		// Recall score - how much of the document is the search term
 		docObjs.Items[idx].Score += float64(recallFreq) / float64(len(tokens))
 		// TODO: optimize when to do this
 		// Load document content
 		docObjs.Items[idx].Data, _ = parseArbJSON(docString)
-		fmt.Println(docObj)
 	}
 	// Sort by rank and keep 100 most accurate documents
 }
@@ -346,8 +362,8 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 	}
 	// Field match with decreasing importance
 	for docID, freq := range freqMap {
-		termFreqScore := 1 + math.Log(1+math.Log(1+float64(freq)))
-		// termFreqScore := float64(freq) / float64(len(output))
+		// termFreqScore := 1 + math.Log(1+math.Log(1+float64(freq)))
+		termFreqScore := float64(freq) / float64(len(output))
 		responseObj.Items = append(responseObj.Items, DocumentObject{
 			Data:  nil,
 			Score: termFreqScore,
@@ -363,6 +379,10 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 	}
 	// Further Scoring
 	scoreDocuments(&responseObj, searchTokens)
+	// Sort again
+	sort.Slice(responseObj.Items, func(i int, j int) bool {
+		return responseObj.Items[i].Score > responseObj.Items[j].Score
+	})
 	end = time.Now()
 	responseObj.ScoreTime = end.Sub(start)
 	return output, responseObj
