@@ -41,9 +41,11 @@ func TestSmallSearch(t *testing.T) {
 	tacoSearchID, tacoSearchData := app.search("tacos", fields, false)
 	burgerSearchID, burgerSearchData := app.search("burger", fields, false)
 
-	ids := []uint64{tacoID, burgerID}
-	documentsCleanup(ids)
+	documentsCleanup([]uint64{tacoID, burgerID})
 
+	if len(tacoSearchID) != 1 || len(tacoSearchData) != 1 || len(burgerSearchID) != 1 || len(burgerSearchData) != 1 {
+		t.Error("Returned wrong number of restults")
+	}
 	if tacoSearchID[0] != tacoID || burgerSearchID[0] != burgerID {
 		t.Error("ID's didnt match")
 	}
@@ -72,11 +74,15 @@ func TestUpdate(t *testing.T) {
 
 	app.updateIndex(uData)
 	updatedID, updatedData := app.search("value2", []string{"index2"}, false)
+
+	if len(updatedID) != 1 || len(updatedData) != 1 {
+		t.Error("Search returned wrong number of results")
+	}
 	if updatedID[0] != docID {
-		t.Error("UPDATE: IDs dont match")
+		t.Error("IDs dont match")
 	}
 	if updatedData[0] != `{"index2":"value2"}` {
-		t.Error("UPDATE: Data doesnt match")
+		t.Error("Data doesnt match")
 	}
 
 	documentsCleanup([]uint64{docID})
@@ -95,6 +101,10 @@ func TestFullCRUD(t *testing.T) {
 	}
 
 	searchedID, searchedData := app.search("value", []string{"index"}, false)
+
+	if len(searchedID) != 1 || len(searchedData) != 1 {
+		t.Error("SEARCH: returned incorrect number of results")
+	}
 	if searchedID[0] != docID {
 		t.Error("SEARCH: IDs dont match")
 	}
