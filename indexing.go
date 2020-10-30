@@ -370,8 +370,8 @@ func (appindex *appIndexes) updateIndex(parsed map[string]interface{}) (errrr er
 	var err error = nil
 	// Validate docID
 	var docID uint64
-	pre, err := parsed["docID"].(json.Number).Int64()
-	docID = uint64(pre)
+	pre := parsed["docID"].(json.Number)
+	docID, err = strconv.ParseUint(pre.String(), 10, 64)
 	if err != nil {
 		return err, false
 	}
