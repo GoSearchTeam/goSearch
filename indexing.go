@@ -325,7 +325,6 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 	if len(responseObj.Items) > 100 {
 		responseObj.Items = responseObj.Items[:100]
 	}
-	fmt.Println("sort", responseObj.Items)
 	// Further Scoring
 	scoreDocuments(&responseObj, searchTokens)
 	end = time.Now()
