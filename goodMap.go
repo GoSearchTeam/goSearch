@@ -24,6 +24,7 @@ func NewList() *GoodList {
 // AddItem inserts the node into the GoodList with lazy sorting
 func (goodList *GoodList) AddItem(item uint64) (newValue uint64, err error) {
 	fmt.Println("Adding", item)
+	// Find insert or update
 	newNode := GoodNode{
 		id:     item,
 		prev:   nil,
@@ -31,7 +32,6 @@ func (goodList *GoodList) AddItem(item uint64) (newValue uint64, err error) {
 		value:  0,
 		mapRef: goodList,
 	}
-	// Find insert or update
 	if goodList.first == nil { // First item
 		newNode.value++
 		goodList.first = &newNode
@@ -44,95 +44,59 @@ func (goodList *GoodList) AddItem(item uint64) (newValue uint64, err error) {
 			return tempNode.value, nil
 		}
 
-		higherNode := tempNode                                 // Keep track of last spot where value is higher if updating to move up
-		for tempNode.next != nil || tempNode.next.id != item { // Leave on end of list or next is item
+		higherNode := tempNode     // Keep track of last spot where value is higher if updating to move up
+		for tempNode.next != nil { // Leave on end of list or next is item
+			if tempNode.next.id == item {
+				break
+			}
 			tempNode = tempNode.next
 			if tempNode.value < higherNode.value { // The node we will need to place after
 				higherNode = tempNode.prev
 			}
 		}
-		updateNode := tempNode.next
 
 		if tempNode.next == nil { // Append to end of list
 			tempNode.next = &newNode
 			newNode.prev = tempNode
+			goodList.last = &newNode
+			newNode.value++
+			return newNode.value, nil
 		} else {
-			tempNode.next = updateNode.next
-			// Check if last node
-			if updateNode.next != nil {
-				updateNode.next.prev = tempNode
-			}
+			updateNode := tempNode.next
 			// Check if higherNode same as tempNode
-
-		}
-		newNode.value++
-		return newNode.value, nil
-
-		for tempNode.next != nil {
-			if tempNode.value < higherNode.value { // Update higher counter node pointer
+			// Manual adjust
+			if tempNode.value > updateNode.value && higherNode.value >= tempNode.value {
 				higherNode = tempNode
 			}
-			if tempNode.next.id == item { // Update
-				updateNode := tempNode.next
-				updateNode.value++
-
-				// Special Cases --- IM GETTING MYSELF SO CONFUSED IM HARD CODING SOME CASES
-
-				// First nodes
-				if tempNode.id == goodList.first.id {
-					fmt.Println("first nodes")
-					goodList.first = updateNode
-					if updateNode.next == nil { // only 2 nodes in list
-						fmt.Println("only 2 in list")
-						goodList.last = tempNode
-					}
-					tempNode.next = updateNode.next
-					tempNode.prev = updateNode
-					updateNode.prev = nil
-					updateNode.next = tempNode
-					return updateNode.value, nil
-				}
-
+			if higherNode != tempNode {
 				tempNode.next = updateNode.next
-
-				if higherNode == tempNode { // Switch spots
-					updateNode.prev = tempNode.prev
-					tempNode.prev = updateNode
-					// Last nodes
-					if updateNode.next == nil {
-						fmt.Println("last node")
-						goodList.last = tempNode
-					} else {
-						updateNode.next.prev = tempNode
-					}
-					updateNode.next = tempNode
-					updateNode.prev.next = updateNode
-					return updateNode.value, nil
+				// Check if last node
+				if updateNode.next != nil {
+					updateNode.next.prev = tempNode
 				}
-
-				// Move behind higher count node
-				// Remove from spot
-				fmt.Println("step out")
-				updateNode.next.prev = tempNode
-				// Insert in new spot
+				higherNode.next.prev = updateNode
 				updateNode.next = higherNode.next
-				if higherNode.id != tempNode.id { // Not same node
-					higherNode.next.prev = updateNode
-				} else if higherNode.id == goodList.first.id { // Update first node
-					goodList.first = updateNode
-				}
-				higherNode.next = updateNode
 				updateNode.prev = higherNode
-
-				return tempNode.next.value, nil
+				higherNode.next = updateNode
+			} else {
+				if higherNode.value < updateNode.value+1 {
+					higherNode.next = updateNode.next
+					if updateNode.next != nil {
+						updateNode.next.prev = higherNode
+					}
+					updateNode.next = higherNode
+					if higherNode.prev != nil {
+						updateNode.prev = higherNode.prev
+					} else { // First node in list
+						goodList.first = updateNode
+						updateNode.prev = nil
+					}
+					higherNode.prev = updateNode
+				}
 			}
-			tempNode = tempNode.next
+			updateNode.value++
+			return updateNode.value, nil
 		}
-		// New node
-		tempNode.next = &newNode
-		newNode.prev = tempNode
-		newNode.value = 1
-		return 1, nil
 	}
 }
 
@@ -164,9 +128,9 @@ func (goodList *GoodList) WalkFn(walkFn func(id uint64, value uint64) bool) {
 
 // ToString returns a string of "(id, value), (id, value)..."
 func (goodList *GoodList) ToString() string {
-	theString := ""
+	theString := "-"
 	goodList.WalkFn(func(id uint64, value uint64) bool {
-		theString = fmt.Sprintf("%v(%v, %v), ", theString, id, value)
+		theString = fmt.Sprintf("%v(%v, %v)-", theString, id, value)
 		return true
 	})
 	return theString
