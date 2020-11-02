@@ -10,6 +10,11 @@ import (
 
 func main() {
 	syscall.Umask(0) // file mode perms
+
+	// Test
+	testList()
+	return
+
 	logFile, _ := os.OpenFile("logs.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0755)
 	mw := io.MultiWriter(os.Stdout, logFile)
 	log.SetOutput(mw)
