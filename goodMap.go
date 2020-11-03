@@ -51,6 +51,7 @@ func (goodList *GoodList) AddItem(item uint64) (newValue uint64, err error) {
 			if tempNode.next.id == item {
 				break
 			}
+			// TODO: Break when I get to value 1 so we can insert there and not walk to end
 			tempNode = tempNode.next
 			if tempNode.value < higherNode.value { // The node we will need to place after
 				higherNode = tempNode.prev
