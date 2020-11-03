@@ -28,7 +28,7 @@ This has very practical application for search for multiple reasons:
 1. All of the benefits of a doubly linked list (fast traversal, memory optimized during manipulations).
 2. When using it as the data type stored in the `Radix Tree`, we can fetch the `X` documents with the highest term frequency by taking the `X` first items in the `GoodList`, with their term frequency, making searches silly fast.
 3. We can conserve memory by storing the frequency with the document ID, without having to repeat values or use arrays.
-4. We can traverse from the end or the front (get documents with highest frequency or lowest frequency)
+4. We can traverse from the front or end (get documents with highest frequency or lowest frequency)
 
 It's pretty fast too:
 
