@@ -16,6 +16,8 @@ type GoodNode struct {
 	mapRef *GoodList
 }
 
+type WalkFn func(id uint64, value uint64) bool
+
 func NewList() *GoodList {
 	newList := GoodList{nil, nil}
 	return &newList
@@ -112,7 +114,7 @@ func GoodListFromArray(arr []uint64) (*GoodList, error) {
 }
 
 // WalkFn walks the list. Return whether to keep walking.
-func (goodList *GoodList) WalkFn(walkFn func(id uint64, value uint64) bool) {
+func (goodList *GoodList) Walk(walkFn WalkFn) {
 	tempNode := goodList.first
 	if goodList.first == nil {
 		return
@@ -129,7 +131,7 @@ func (goodList *GoodList) WalkFn(walkFn func(id uint64, value uint64) bool) {
 // ToString returns a string of "(id, value), (id, value)..."
 func (goodList *GoodList) ToString() string {
 	theString := "-"
-	goodList.WalkFn(func(id uint64, value uint64) bool {
+	goodList.Walk(func(id uint64, value uint64) bool {
 		theString = fmt.Sprintf("%v(%v, %v)-", theString, id, value)
 		return true
 	})
