@@ -3,15 +3,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/dgrijalva/jwt-go"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/gorilla/websocket"
 )
 
 var wsupgrader = websocket.Upgrader{
@@ -65,7 +66,7 @@ func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, c *gin.Context, 
 
 	conn, err := wsupgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Println("Failed to set websocket upgrade: %v", err)
+		log.Printf("Failed to set websocket upgrade: %v\n", err)
 		return
 	}
 	for {
