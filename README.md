@@ -100,6 +100,6 @@ Opening up a document to rank and sort is very expensive. In order to handle the
 
 #### Test 1 - A Primitive Test
 ![unknown-3](/assets/unknown-3.png)
-_Note: These tests were performed on a MacBook Pro, while in a Zoom call and running lots of other apps. This test is primitive and should be no indication of full performance capabilities. The requests and GoSearch were on the same device (localhost network)._
+_Note: These tests were performed on a MacBook Pro, while in a Zoom call and running lots of other apps. This test is primitive and should be no indication of full performance capabilities. The requests and GoSearch were on the same device (localhost network). This test is also pre-GoodLists._
 
 A Zoom call was opened at ~2.5 million documents stored, which you can see a visible change in dispersion of latencies.
