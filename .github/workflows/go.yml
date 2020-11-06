@@ -26,5 +26,8 @@ jobs:
     - name: Test
       run: make test
 
-    - name: Log Docs
-      run: make log
+    - name: Archive documents
+      uses: actions/upload-artifact@v2
+      with:
+        name: documents
+        path: documents
