@@ -6,4 +6,4 @@ install:
 test:
 	go test -v .
 log:
-	find ./documents/ -type f | xargs tail -n +1
+	find ./documents/ -type f | xargs tail -n +1 && echo
