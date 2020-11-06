@@ -27,5 +27,4 @@ jobs:
       run: make test
 
     - name: Log Docs
-      shell: bash
-      run: find ./ -type f | xargs tail -n +1
+      run: make log
