@@ -28,4 +28,5 @@ jobs:
 
     - name: Log Docs
       shell: bash
-      run: find ./ -type f | xargs tail -n +1
+      run: |
+        find ./ -type f | xargs tail -n +1
