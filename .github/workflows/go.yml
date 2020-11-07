@@ -17,14 +17,13 @@ jobs:
     - name: Check out code into the Go module directory
       uses: actions/checkout@v2
 
+    - name: Install
+      run: make install
+
     - name: Build
       run: make build
 
     - name: Test
-      run: make test
-
-    - name: Archive documents
-      uses: actions/upload-artifact@v2
-      with:
-        name: documents
-        path: documents
+      run: |
+        make test
+        find ./documents/ -type f | xargs tail -n +1
