@@ -25,5 +25,7 @@ jobs:
 
     - name: Test
       run: |
+        echo start
         make test
+        echo end
         find ./documents/ -type f | xargs tail -n +1
