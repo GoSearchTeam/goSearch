@@ -24,8 +24,10 @@ jobs:
       run: make build
 
     - name: Test
+      run: make test
+
+    - name: Log Docs
+      if: ${{ failure() }}
       run: |
-        echo start
-        make test
-        echo end
-        find ./documents/ -type f | xargs tail -n +1
+        echo Documents reamining after failure...
+        find ./ -type f | xargs tail -n +1
