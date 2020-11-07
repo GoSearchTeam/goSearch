@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
 
   build:
-    name: Build
+    name: Build_and_test
     runs-on: ubuntu-latest
     steps:
 
@@ -30,4 +30,5 @@ jobs:
       if: ${{ failure() }}
       run: |
         echo Documents reamining after failure...
-        find ./ -type f | xargs tail -n +1
+        find ./documents/ -type f | xargs tail -n +1
+        echo
