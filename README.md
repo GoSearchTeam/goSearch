@@ -5,7 +5,8 @@ Full-Text Search Engine Written in Go
 
 - [Performance](#performance)
   - [Data Structures](#data-structures)
-    - [Wait, what is a GoodList?](#wait-what-is-a-goodlist)
+    - [Why OrderedMaps?](#why-orderedmaps)
+      - [Advanced NoSQL Patterns for Search](#advanced-nosql-patterns-for-search)
 - [How it Works](#how-it-works)
     - [Basic Architecture](#basic-architecture)
     - [Ranking and Sorting](#ranking-and-sorting)
@@ -15,66 +16,21 @@ Full-Text Search Engine Written in Go
 
 ### Data Structures
 
-To build the high performing index and search core, we leveraged _inverted indexes_, _GoodLists_, and _radix trees_.
+To build the high performing index and search core, we leveraged _inverted indexes_, _OrderedMaps (called LinkedHashMaps in Java)_, and _radix trees_.
 
-These allowed the impressive testing performance seen below.
+#### Why OrderedMaps?
 
-#### Wait, what is a GoodList?
+What we needed was a data structure that had native sorting (for listing first n items in O(n) time), but also could insert, update, or delete items in O(1) time. Enter the sorted map (known as a linked hash map in Java). It was not as simple as using `OrderedMaps`, since we needed to sort by the score (what would traditionally be the `value` in the `key, value` pair maps use). To effectively use this we had to deploy advanced NoSQL data modeling techniques.
 
-Glad you asked! I (Dan Goodman) invented it! _See what a did with my name there? 😉 It's also just a good list._ A `GoodList` is basically a `Doubly Linked List` with sorting at modify time. In other words, when ever you insert/update or delete an item, it keeps track on where it is supposed to be moved in the linked list. That way it can modify items and sort them in `O(n)` time, just like normal linked list manipulations would occur in.
+##### Advanced NoSQL Patterns for Search
 
-This has very practical application for search for multiple reasons:
+Since we are basically making the NoSQL version of a full-text search indexing platform, in hindsight it's no surprise that NoSQL data modeling techniques make an appearance. Yet until it was realized, it was not obvious.
 
-1. All of the benefits of a doubly linked list (fast traversal, memory optimized during manipulations).
-2. When using it as the data type stored in the `Radix Tree`, we can fetch the `X` documents with the highest term frequency by taking the `X` first items in the `GoodList`, with their term frequency, making searches silly fast.
-3. We can conserve memory by storing the frequency with the document ID, without having to repeat values or use arrays.
-4. We can traverse from the front or end (get documents with highest frequency or lowest frequency)
+OrderedMaps are sorted by their key, and as a result we could run into conflicts with documents having the same score if we used them in a `(score, docID)` format. Additionally, we want to design our data structure for read speed, willing to sacrifice insert, update, and delete speeds in the process.
 
-It's pretty fast too:
+To get the read performance we want (O(n) time for iterating over highest scored n items), we needed the `score` to be in the key. But in order to prevent collisions from overwriting, we also needed the `docID` to be in the key. _Enter compound keys._ By leveraging the format of `(score#docID, null)`, we get the best of both worlds. We can sort by `score`, then by `docID`.
 
-```
-// Legend: (id, frequency)
-Adding 3
--(3, 1)- in 18.503µs
-Adding 4
--(3, 1)-(4, 1)- in 1.1µs
-Adding 4
--(4, 2)-(3, 1)- in 1.039µs
-Adding 5
--(4, 2)-(3, 1)-(5, 1)- in 879ns
-Adding 5
--(4, 2)-(5, 2)-(3, 1)- in 916ns
-Adding 5
--(5, 3)-(4, 2)-(3, 1)- in 880ns
-Adding 4
--(5, 3)-(4, 3)-(3, 1)- in 844ns
-Adding 4
--(4, 4)-(5, 3)-(3, 1)- in 849ns
-Adding 3
--(4, 4)-(5, 3)-(3, 2)- in 877ns
-Adding 3
--(4, 4)-(5, 3)-(3, 3)- in 872ns
-Adding 3
--(4, 4)-(3, 4)-(5, 3)- in 871ns
-Adding 3
--(3, 5)-(4, 4)-(5, 3)- in 855ns
-Adding 1
--(3, 5)-(4, 4)-(5, 3)-(1, 1)- in 846ns
-Adding 6
--(3, 5)-(4, 4)-(5, 3)-(1, 1)-(6, 1)- in 883ns
-Adding 7
--(3, 5)-(4, 4)-(5, 3)-(1, 1)-(6, 1)-(7, 1)- in 878ns
-Adding 6
--(3, 5)-(4, 4)-(5, 3)-(6, 2)-(1, 1)-(7, 1)- in 873ns
-Adding 5
--(3, 5)-(4, 4)-(5, 4)-(6, 2)-(1, 1)-(7, 1)- in 839ns
-Adding 4
--(3, 5)-(4, 5)-(5, 4)-(6, 2)-(1, 1)-(7, 1)- in 839ns
-Adding 4
--(4, 6)-(3, 5)-(5, 4)-(6, 2)-(1, 1)-(7, 1)- in 867ns
-```
-
-_See `goodMap.go` for the code, maybe I'll make it into it's own package soon._
+We still maintain very high speeds for insert (O(1) time), as well as update/delete (i + O(1), where i is the time it takes to re-score a document). For delete, since we are given the `docID`, what we can do is fetch the document from disk, re-calculate the score of each field, then use those scores to make O(1) delete operations on the OrderedMap by using the `score#docID` key. For updates, we are also given the `docID`, and perform a delete than insert (i + 2(O(1)) time). This keeps all operations very fast, and by using a `null` (`nil` in Go) value we save some memory since we can pull both the `score` and `docID` by splitting the key at the `#`.
 
 ## How it Works
 

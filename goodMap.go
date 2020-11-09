@@ -1,7 +1,8 @@
 package main
 
-import ()
-import "fmt"
+import (
+	"fmt"
+)
 
 type GoodList struct {
 	first *GoodNode
@@ -10,13 +11,13 @@ type GoodList struct {
 
 type GoodNode struct {
 	id     uint64
-	value  uint64
+	value  float64
 	prev   *GoodNode
 	next   *GoodNode
 	mapRef *GoodList
 }
 
-type WalkFn func(id uint64, value uint64) bool
+type WalkFn func(id uint64, value float64) bool
 
 func NewList() *GoodList {
 	newList := GoodList{nil, nil}
@@ -24,27 +25,34 @@ func NewList() *GoodList {
 }
 
 // AddItem inserts the node into the GoodList with lazy sorting
-func (goodList *GoodList) AddItem(item uint64) (newValue uint64, err error) {
+func (goodList *GoodList) AddItem(item uint64, valu float64) (newValue float64, err error) {
 	fmt.Println("Adding", item)
 	// Find insert or update
 	newNode := GoodNode{
 		id:     item,
 		prev:   nil,
 		next:   nil,
-		value:  0,
+		value:  valu,
 		mapRef: goodList,
 	}
 	if goodList.first == nil { // First item
-		newNode.value++
+		newNode.value = valu
 		goodList.first = &newNode
 		goodList.last = &newNode
 		return newNode.value, nil
+	} else if goodList.first.value < valu { // Replace first node
+		tempNode := goodList.first
+		goodList.first = &newNode
+		goodList.last = tempNode
+		newNode.next = tempNode
+		tempNode.prev = &newNode
+		return newNode.value, nil
 	} else {
 		tempNode := goodList.first
-		if tempNode.id == item { // Check if first node
-			tempNode.value++
-			return tempNode.value, nil
-		}
+		// if tempNode.id == item { // Check if first node
+		// 	tempNode.value = valu
+		// 	return tempNode.value, nil
+		// }
 
 		higherNode := tempNode     // Keep track of last spot where value is higher if updating to move up
 		for tempNode.next != nil { // Leave on end of list or next is item
@@ -62,7 +70,7 @@ func (goodList *GoodList) AddItem(item uint64) (newValue uint64, err error) {
 			tempNode.next = &newNode
 			newNode.prev = tempNode
 			goodList.last = &newNode
-			newNode.value++
+			newNode.value = valu
 			return newNode.value, nil
 		} else {
 			updateNode := tempNode.next
@@ -97,16 +105,16 @@ func (goodList *GoodList) AddItem(item uint64) (newValue uint64, err error) {
 					higherNode.prev = updateNode
 				}
 			}
-			updateNode.value++
+			updateNode.value = valu
 			return updateNode.value, nil
 		}
 	}
 }
 
-func GoodListFromArray(arr []uint64) (*GoodList, error) {
+func GoodListFromArray(arr []uint64, vals []float64) (*GoodList, error) {
 	newList := GoodList{nil, nil}
-	for _, item := range arr {
-		_, err := newList.AddItem(item)
+	for idx, item := range arr {
+		_, err := newList.AddItem(item, vals[idx])
 		if err != nil {
 			return nil, err
 		}
@@ -132,7 +140,7 @@ func (goodList *GoodList) Walk(walkFn WalkFn) {
 // ToString returns a string of "(id, value), (id, value)..."
 func (goodList *GoodList) ToString() string {
 	theString := "-"
-	goodList.Walk(func(id uint64, value uint64) bool {
+	goodList.Walk(func(id uint64, value float64) bool {
 		theString = fmt.Sprintf("%v(%v, %v)-", theString, id, value)
 		return true
 	})

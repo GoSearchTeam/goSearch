@@ -49,7 +49,7 @@ func UpgradeToWebsocket(w http.ResponseWriter, r *http.Request, c *gin.Context, 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 		// Check exists
 
-	} else if int64(claims["exp"].(float64)) <= time.Now().Unix() { // Check expired
+	} else if int64(claims["exp"].(float32)) <= time.Now().Unix() { // Check expired
 		c.JSON(401, gin.H{
 			"msg": "Token Expired",
 		})
