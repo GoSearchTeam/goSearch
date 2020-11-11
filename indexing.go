@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/gob"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/armon/go-radix"
 	"github.com/elliotchance/orderedmap"
@@ -17,6 +18,17 @@ import (
 	"strings"
 	"time"
 )
+
+// =============================================================================
+// Globals
+// =============================================================================
+
+// Apps is the array of App Indexes
+var Apps map[string]*appIndexes
+
+// =============================================================================
+// Structs
+// =============================================================================
 
 type indexMap struct {
 	field          string
@@ -55,6 +67,7 @@ type SearchResponse struct {
 
 func initApp(name string) *appIndexes {
 	appindex := appIndexes{make([]indexMap, 0), name, 0}
+	Apps[name] = &appindex
 	return &appindex
 }
 
@@ -218,6 +231,24 @@ func loadDocuments(docObjs *SearchResponse) {
 		// Determine recall of document
 		docString := fetchDocument(docObj.DocID)
 		docObjs.Items[idx].Data, _ = parseArbJSON(docString)
+	}
+}
+
+// ListApps lists the names of current apps
+func ListApps() []string {
+	appArr := make([]string, 0)
+	for k, _ := range Apps {
+		appArr = append(appArr, k)
+	}
+	return appArr
+}
+
+func GetApp(appName string) (*appIndexes, error) {
+	app := Apps[appName]
+	if app == nil {
+		return nil, errors.New("App does not exist!")
+	} else {
+		return app, nil
 	}
 }
 
