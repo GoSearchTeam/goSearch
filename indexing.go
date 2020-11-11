@@ -248,6 +248,12 @@ func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, file
 	rand.Seed(time.Now().UnixNano())
 	id, _ := strconv.ParseUint(filename, 10, 64)
 	// log.Println("### ID:", id)
+	var totalDocLen int
+	for _, v := range parsed {
+		totalDocLen += len(strings.FieldsFunc(v.(string), func(r rune) bool {
+			return r == ' ' || r == '"'
+		}))
+	}
 	for k, v := range parsed {
 		// Don't index ID
 		if strings.ToLower(k) == "docid" {
@@ -268,7 +274,7 @@ func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, file
 		}
 
 		// Add index to indexMap
-		indexMapPointer.addIndex(id, fmt.Sprintf("%v", v))
+		indexMapPointer.addIndex(id, fmt.Sprintf("%v", v), totalDocLen)
 
 	}
 	// Write indexes document to disk
@@ -294,6 +300,12 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 		id = rand.Uint64()
 	}
 	// log.Println("### ID:", id)
+	var totalDocLen int
+	for _, v := range parsed {
+		totalDocLen += len(strings.FieldsFunc(v.(string), func(r rune) bool {
+			return r == ' ' || r == '"'
+		}))
+	}
 	for k, v := range parsed {
 		// Don't index ID
 		if strings.ToLower(k) == "docid" {
@@ -314,7 +326,7 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 		}
 
 		// Add index to indexMap
-		indexMapPointer.addIndex(id, fmt.Sprintf("%v", v))
+		indexMapPointer.addIndex(id, fmt.Sprintf("%v", v), totalDocLen)
 	}
 	// Remove docID field
 	delete(parsed, "docID")
@@ -390,12 +402,12 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 								prevScore := val[0]
 								prevLen := val[1]
 								newVal[0] = prevScore + (tfWeighting * float32(idfWeighting))
-								newVal[1] = prevLen + fieldLen
-								avgDocLen += fieldLen
+								newVal[1] = prevLen
 								output[docID] = newVal
 							} else {
 								newVal[0] = tfWeighting
 								newVal[1] = fieldLen
+								fmt.Println()
 								avgDocLen += fieldLen
 								output[docID] = newVal
 							}
@@ -461,7 +473,8 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 	// Now we have docID: [score, docLen]
 	for docID, scoreLen := range output {
 		termsInQueryLen := len(strings.Fields(input))
-		finalDocScore := (scoreLen[0] / avgDocLen) * float32(termsInQueryLen)
+		fmt.Println(docID, scoreLen[1], avgDocLen)
+		finalDocScore := (scoreLen[0] / (scoreLen[1] / avgDocLen)) * float32(termsInQueryLen)
 		responseObj.Items = append(responseObj.Items, DocumentObject{
 			Data:  nil,
 			Score: finalDocScore,
@@ -675,7 +688,7 @@ func calculateTokenScoreByField(fieldValue string, tokenValue string, totalDocum
 	return float32(termFreqWeight)
 }
 
-func (indexmap *indexMap) addIndex(id uint64, value string) {
+func (indexmap *indexMap) addIndex(id uint64, value string, docLen int) {
 	CheckDocumentsFolder()
 	// Tokenize
 	for _, token := range lowercaseTokens(tokenizeString(value)) {
@@ -687,7 +700,7 @@ func (indexmap *indexMap) addIndex(id uint64, value string) {
 			ids = orderedmap.NewOrderedMap()
 			// Calculate token score here
 			documentTermScore := calculateTokenScoreByField(value, token, indexmap.TotalDocuments, ids.Len())
-			ids.Set(createOrderMapKey(id, documentTermScore), len(strings.Fields(value)))
+			ids.Set(createOrderMapKey(id, documentTermScore), docLen)
 			_, updated := indexmap.index.Insert(token, ids)
 			if updated {
 				fmt.Errorf("### SOMEHOW UPDATED WHEN INSERTING NEW ###\n")
@@ -697,7 +710,7 @@ func (indexmap *indexMap) addIndex(id uint64, value string) {
 			node := prenode.(*orderedmap.OrderedMap)
 			ids = node
 			documentTermScore := calculateTokenScoreByField(value, token, indexmap.TotalDocuments, ids.Len())
-			node.Set(createOrderMapKey(id, documentTermScore), len(strings.Fields(value)))
+			node.Set(createOrderMapKey(id, documentTermScore), docLen)
 			_, updated := indexmap.index.Insert(token, node)
 			if !updated {
 				fmt.Errorf("### SOMEHOW DIDN'T UPDATE WHEN UPDATING INDEX ###\n")
