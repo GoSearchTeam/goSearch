@@ -67,6 +67,9 @@ type SearchResponse struct {
 
 func initApp(name string) *appIndexes {
 	appindex := appIndexes{make([]indexMap, 0), name, 0}
+	if Apps == nil {
+		Apps = make(map[string]*appIndexes, 0)
+	}
 	Apps[name] = &appindex
 	return &appindex
 }
@@ -179,52 +182,6 @@ func fetchDocument(docID uint64) string {
 	return string(dat)
 }
 
-func scoreDocuments(docObjs *SearchResponse, tokens []string) {
-	for idx, docObj := range docObjs.Items {
-		// Determine precision of document
-		// Determine recall of document
-		docString := fetchDocument(docObj.DocID)
-		// numDocs := len(docObjs.Items)
-		recallFreq := 0
-		// TODO: Create list of unique tokens? Do we want to bother or can repeated items in a query mean a boost?
-		// uniqueTokens := make(map[string]string)
-		for _, token := range tokens { // TODO: lower weight of common words (e.g. if, the, a) (idf - inverse document frequency IDF(w)= log (N/df(w)) , TF (w) * IDF(w) ,  TF(w)*IDF(w)/len(d)  )
-			// ^^^ The more documents contain a token, the less important that token is (lower score)
-			// Precision score - how much of the search term is the document
-			// Substring match
-			tokenSubFreq := strings.Count(strings.ToLower(docString), token)
-
-			// BEGIN Precision word match
-			tokenPrecisionFreq := 0
-			docStringWord := strings.FieldsFunc(docString, func(r rune) bool {
-				return r == ' ' || r == '"'
-			})
-			for _, word := range docStringWord {
-				if strings.ToLower(word) == token {
-					tokenPrecisionFreq++
-				}
-			}
-			tfPrecisionWeightedScore := 1 + float32(math.Log(1+math.Log(1+float64(tokenPrecisionFreq))))
-			docObjs.Items[idx].Score += tfPrecisionWeightedScore
-			// END Precision word match
-
-			if tokenSubFreq > 0 {
-				recallFreq++
-			}
-
-			// totalDocLen := len(strings.Fields(docString))
-			tfWeightedScore := 1 + float32(math.Log(1+math.Log(1+float64(tokenSubFreq))))
-			docObjs.Items[idx].Score += tfWeightedScore
-		}
-		// Recall score - how much of the document is the search term
-		docObjs.Items[idx].Score += float32(recallFreq) / float32(len(tokens))
-		// TODO: optimize when to do this
-		// Load document content
-		docObjs.Items[idx].Data, _ = parseArbJSON(docString)
-	}
-	// Sort by rank and keep 100 most accurate documents
-}
-
 func loadDocuments(docObjs *SearchResponse) {
 	for idx, docObj := range docObjs.Items {
 		// Determine precision of document
@@ -280,8 +237,9 @@ func (appIndex *appIndexes) listIndexes() []string {
 // addIndexMap creates a new index map (field) to be indexes
 func (appindex *appIndexes) addIndexMap(name string) *indexMap {
 	newIndexMap := indexMap{name, radix.New(), 0}
+	oldLen := len(appindex.Indexes)
 	appindex.Indexes = append(appindex.Indexes, newIndexMap)
-	return &newIndexMap
+	return &appindex.Indexes[oldLen]
 }
 
 func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, filename string) (documentID uint64) {
@@ -311,6 +269,7 @@ func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, file
 
 		// Add index to indexMap
 		indexMapPointer.addIndex(id, fmt.Sprintf("%v", v))
+
 	}
 	// Write indexes document to disk
 	fmt.Sprintf("Writing out to: %s\n", fmt.Sprintf("./documents/%v", id))
@@ -341,7 +300,7 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 			continue
 		}
 		// Find if indexMap already exists
-		var indexMapPointer *indexMap = nil
+		var indexMapPointer *indexMap
 		for i := 0; i < len(appindex.Indexes); i++ {
 			if k == appindex.Indexes[i].field {
 				indexMapPointer = &appindex.Indexes[i]
@@ -361,22 +320,19 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 	delete(parsed, "docID")
 	appindex.TotalDocuments++ // Increase document count
 	// Write indexes document to disk
-	fmt.Sprintf("Writing out to: %s\n", fmt.Sprintf("./documents/%v", id))
+	// fmt.Printf("Writing out to: %s\n", fmt.Sprintf("./documents/%v", id))
 	sendback, _ := stringIndex(parsed)
 	ioutil.WriteFile(fmt.Sprintf("./documents/%v", id), []byte(sendback), os.FileMode(0660))
 	return id
-
-	// TODO: Store document
-	// TODO: check if tree exists with name of every json key, if not create tree
-
 }
 
 func (appindex *appIndexes) search(input string, fields []string, bw bool) (documentIDs []uint64, response SearchResponse) {
-	output := make(map[uint64]float32, 0)
+	output := make(map[uint64][]float32, 0) // docID: [score, docLen]
+	var avgDocLen float32
 	// Tokenize input
 	start := time.Now()
 	searchTokens := lowercaseTokens(tokenizeString(input))
-	for _, token := range searchTokens {
+	for _, token := range searchTokens { // Initial scoring pass, covers TF weighting and IDF weighting
 		// Check fields
 		if len(fields) == 0 { // check all
 			// log.Println("### No fields given, searching all fields...")
@@ -384,13 +340,67 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 				// log.Println("### Searching index:", indexmap.field, "for", token)
 				if bw {
 					searchItems := indexmap.beginsWithSearch(token)
-					for k, v := range searchItems {
-						output[k] = v
+					for _, searchItem := range searchItems {
+						if searchItem != nil {
+							// FIXME: This is a hacky solution for getting number of docs with the term in it
+							numDocsWithTerm := 0
+							for el := searchItem.Front(); el != nil || numDocsWithTerm >= 100; el = el.Next() {
+								numDocsWithTerm++
+							}
+							// Only first 100 items in orderedmap
+							iterCount := 0
+							for el := searchItem.Front(); el != nil || iterCount >= 100; el = el.Next() {
+								docID, tfWeighting := parseOrderMapKey(el.Key.(string))
+								idfWeighting := math.Log(float64(1+indexmap.TotalDocuments) / float64(numDocsWithTerm))
+								fieldLen := float32(el.Value.(int))
+								newVal := make([]float32, 2)
+								if val, ok := output[docID]; ok { // Exists
+									prevScore := val[0]
+									prevLen := val[1]
+									newVal[0] = prevScore + (tfWeighting * float32(idfWeighting))
+									newVal[1] = prevLen + fieldLen
+									avgDocLen += fieldLen
+									output[docID] = newVal
+								} else {
+									newVal[0] = tfWeighting
+									newVal[1] = fieldLen
+									avgDocLen += fieldLen
+									output[docID] = newVal
+								}
+								iterCount++
+							}
+						}
 					}
 				} else {
 					searchItems := indexmap.search(token)
-					for k, v := range searchItems {
-						output[k] = v
+					if searchItems != nil {
+						// FIXME: This is a hacky solution for getting number of docs with the term in it
+						numDocsWithTerm := 0
+						for el := searchItems.Front(); el != nil || numDocsWithTerm >= 100; el = el.Next() {
+							numDocsWithTerm++
+						}
+						// Only first 100 items in orderedmap
+						iterCount := 0
+						for el := searchItems.Front(); el != nil || iterCount >= 100; el = el.Next() {
+							docID, tfWeighting := parseOrderMapKey(el.Key.(string))
+							idfWeighting := math.Log(float64(1+indexmap.TotalDocuments) / float64(numDocsWithTerm))
+							fieldLen := float32(el.Value.(int))
+							newVal := make([]float32, 2)
+							if val, ok := output[docID]; ok { // Exists
+								prevScore := val[0]
+								prevLen := val[1]
+								newVal[0] = prevScore + (tfWeighting * float32(idfWeighting))
+								newVal[1] = prevLen + fieldLen
+								avgDocLen += fieldLen
+								output[docID] = newVal
+							} else {
+								newVal[0] = tfWeighting
+								newVal[1] = fieldLen
+								avgDocLen += fieldLen
+								output[docID] = newVal
+							}
+							iterCount++
+						}
 					}
 				}
 			}
@@ -398,8 +408,36 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 			for _, field := range fields {
 				// log.Println("### Searching index:", field, "for", token)
 				searchItems := appindex.searchByField(token, field, bw)
-				for k, v := range searchItems {
-					output[k] = v
+				for _, searchItem := range searchItems {
+					if searchItem != nil {
+						// FIXME: This is a hacky solution for getting number of docs with the term in it
+						numDocsWithTerm := 0
+						for el := searchItem.Front(); el != nil || numDocsWithTerm >= 100; el = el.Next() {
+							numDocsWithTerm++
+						}
+						// Only first 100 items in orderedmap
+						iterCount := 0
+						for el := searchItem.Front(); el != nil || iterCount >= 100; el = el.Next() {
+							docID, tfWeighting := parseOrderMapKey(el.Key.(string))
+							// FIXME: Currently does not cover the IDF weighting
+							fieldLen := float32(el.Value.(int))
+							newVal := make([]float32, 2)
+							if val, ok := output[docID]; ok { // Exists
+								prevScore := val[0]
+								prevLen := val[1]
+								newVal[0] = prevScore + tfWeighting
+								newVal[1] = prevLen + float32(fieldLen)
+								avgDocLen += float32(fieldLen)
+								output[docID] = newVal
+							} else {
+								newVal[0] = tfWeighting
+								newVal[1] = float32(fieldLen)
+								avgDocLen += float32(fieldLen)
+								output[docID] = newVal
+							}
+							iterCount++
+						}
+					}
 				}
 			}
 		}
@@ -410,19 +448,23 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 	end := time.Now()
 	diff := end.Sub(start)
 	responseObj.SearchTime = diff
-	// Get field match count (does the doc match all the fields?)
+
+	// -------------------
+	// Scoring and Sorting
+	// -------------------
+
 	start = time.Now()
-	// freqMap := make(map[uint64]int)
-	// for _, docID := range output {
-	// 	freqMap[docID] = freqMap[docID] + 1
-	// }
-	// Field match with decreasing importance
-	for docID, score := range output {
-		// termFreqScore := 1 + math.Log(1+math.Log(1+float32(freq)))
-		termFreqScore := float32(score) / float32(len(output))
+
+	// Calculate avg doc len
+	avgDocLen = avgDocLen / float32(len(output)) // Get average
+
+	// Now we have docID: [score, docLen]
+	for docID, scoreLen := range output {
+		termsInQueryLen := len(strings.Fields(input))
+		finalDocScore := (scoreLen[0] / avgDocLen) * float32(termsInQueryLen)
 		responseObj.Items = append(responseObj.Items, DocumentObject{
 			Data:  nil,
-			Score: termFreqScore,
+			Score: finalDocScore,
 			DocID: docID,
 		})
 	}
@@ -433,34 +475,32 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 	if len(responseObj.Items) > 100 {
 		responseObj.Items = responseObj.Items[:100]
 	}
-	// Further Scoring
-	// scoreDocuments(&responseObj, searchTokens)
-	// // Sort again
-	// sort.Slice(responseObj.Items, func(i int, j int) bool {
-	// 	return responseObj.Items[i].Score > responseObj.Items[j].Score
-	// })
+	end = time.Now()
+	responseObj.ScoreTime = end.Sub(start)
+
+	// -----------------
+	// Loading Documents
+	// -----------------
+
+	start = time.Now()
 	loadDocuments(&responseObj)
 	end = time.Now()
 	responseObj.LoadTime = end.Sub(start)
-	yeye := make([]uint64, 0)
+	yeye := make([]uint64, 0) // FIXME: This is a temp solution obviously
 	return yeye, responseObj
 }
 
-func (appindex *appIndexes) searchByField(input string, field string, bw bool) (documents map[uint64]float32) {
+func (appindex *appIndexes) searchByField(input string, field string, bw bool) (documents []*orderedmap.OrderedMap) {
 	// Check if field exists
-	output := make(map[uint64]float32, 0)
+	output := make([]*orderedmap.OrderedMap, 0)
 	for _, indexmap := range appindex.Indexes {
 		if indexmap.field == field {
 			if bw {
 				searchItems := indexmap.beginsWithSearch(input)
-				for k, v := range searchItems {
-					output[k] = v
-				}
+				output = append(output, searchItems...)
 			} else {
 				searchItems := indexmap.search(input)
-				for k, v := range searchItems {
-					output[k] = v
-				}
+				output = append(output, searchItems)
 			}
 			break
 		}
@@ -559,6 +599,7 @@ func (appindex *appIndexes) deleteIndex(docID uint64) error {
 						}
 					}
 				}
+				indexmap.TotalDocuments--
 				break
 			}
 		}
@@ -646,7 +687,7 @@ func (indexmap *indexMap) addIndex(id uint64, value string) {
 			ids = orderedmap.NewOrderedMap()
 			// Calculate token score here
 			documentTermScore := calculateTokenScoreByField(value, token, indexmap.TotalDocuments, ids.Len())
-			ids.Set(createOrderMapKey(id, documentTermScore), nil)
+			ids.Set(createOrderMapKey(id, documentTermScore), len(strings.Fields(value)))
 			_, updated := indexmap.index.Insert(token, ids)
 			if updated {
 				fmt.Errorf("### SOMEHOW UPDATED WHEN INSERTING NEW ###\n")
@@ -656,7 +697,7 @@ func (indexmap *indexMap) addIndex(id uint64, value string) {
 			node := prenode.(*orderedmap.OrderedMap)
 			ids = node
 			documentTermScore := calculateTokenScoreByField(value, token, indexmap.TotalDocuments, ids.Len())
-			node.Set(createOrderMapKey(id, documentTermScore), nil)
+			node.Set(createOrderMapKey(id, documentTermScore), len(strings.Fields(value)))
 			_, updated := indexmap.index.Insert(token, node)
 			if !updated {
 				fmt.Errorf("### SOMEHOW DIDN'T UPDATE WHEN UPDATING INDEX ###\n")
@@ -667,38 +708,24 @@ func (indexmap *indexMap) addIndex(id uint64, value string) {
 	indexmap.TotalDocuments++
 }
 
-// search returns an array of document ids
-func (indexmap *indexMap) search(input string) (documents map[uint64]float32) {
-	output := make(map[uint64]float32, 0)
+func (indexmap *indexMap) search(input string) (documents *orderedmap.OrderedMap) {
 	search, _ := indexmap.index.Get(input)
 	if search == nil {
-		return output
+		return nil
 	}
 	node := search.(*orderedmap.OrderedMap)
-	// Get first 100 items in node
-	iterCount := 0
-	for el := node.Front(); el != nil || iterCount >= 100; el = el.Next() {
-		docID, score := parseOrderMapKey(el.Key.(string))
-		output[docID] = score
-		iterCount++
-	}
-	return output
+	return node
 }
 
-func (indexmap *indexMap) beginsWithSearch(input string) (documents map[uint64]float32) {
-	output := make(map[uint64]float32, 0)
+func (indexmap *indexMap) beginsWithSearch(input string) (documents []*orderedmap.OrderedMap) {
+	output := make([]*orderedmap.OrderedMap, 0)
 	count := 0
 	indexmap.index.WalkPrefix(input, func(key string, value interface{}) bool {
 		if count >= 100 {
 			return true
 		}
 		node := value.(*orderedmap.OrderedMap)
-		iterCount := 0
-		for el := node.Front(); el != nil || iterCount >= 100; el = el.Next() {
-			docID, score := parseOrderMapKey(el.Key.(string))
-			output[docID] = score
-			iterCount++
-		}
+		output = append(output, node)
 		return false
 	})
 	return output
