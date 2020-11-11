@@ -106,7 +106,7 @@ func LoadAppsFromDisk() (apps []*appIndexes) {
 	filepath.Walk("./apps", func(path string, info os.FileInfo, err error) error {
 		appName := filepath.Base(path)
 		if info == nil {
-			log.Println("Error: ./apps/%s does not exist", appName)
+			log.Printf("Error: ./apps/%s does not exist\n", appName)
 			return nil
 		}
 		if info.IsDir() {
@@ -149,7 +149,7 @@ func (app *appIndexes) LoadIndexesFromDisk() { // TODO: Change to search folders
 	}
 	filepath.Walk(fmt.Sprintf("./serialized/%s", app.Name), func(path string, info os.FileInfo, err error) error {
 		if info == nil {
-			fmt.Println("Error: ./serialized/%s does not exist", app.Name)
+			fmt.Printf("Error: ./serialized/%s does not exist\n", app.Name)
 			return nil
 		}
 		if info.IsDir() {
@@ -589,14 +589,14 @@ func (appindex *appIndexes) deleteIndex(docID uint64) error {
 				for _, token := range lowercaseTokens(tokenizeString(input)) {
 					tokenMap, _ := indexmap.index.Get(token)
 					if tokenMap == nil { // somehow not indexed
-						log.Printf("### Error: field not indexes from disk document (deleteIndex)")
+						log.Printf("### Error: field not indexes from disk document (deleteIndex)\n")
 						continue
 					} else { // update node
 						docMap := tokenMap.(*orderedmap.OrderedMap)
 						documentTermScore := calculateTokenScoreByField(input, token, indexmap.TotalDocuments, docMap.Len())
 						deleted := docMap.Delete(createOrderMapKey(docID, documentTermScore))
 						if deleted != true {
-							log.Printf("### Error: Document entry not deleted for token", token)
+							log.Printf("### Error: Document entry not deleted for token %s\n", token)
 						}
 						if docMap.Len() == 0 {
 							_, deleted := indexmap.index.Delete(token) // this should delete the node if it is empty
