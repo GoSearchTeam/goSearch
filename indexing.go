@@ -219,6 +219,8 @@ func GetApp(appName string) (*appIndexes, error) {
 	}
 }
 
+// Dan's method uses less memory than https://play.golang.org/p/LjOrp4k6lqf because we aren't appending to an array (dan is faster on load but slower and serial)
+
 func convertOrderedToNormalMap(ordMap *orderedmap.OrderedMap) map[string]int {
 	output := make(map[string]int)
 	for el := ordMap.Front(); el != nil; el = el.Next() {
