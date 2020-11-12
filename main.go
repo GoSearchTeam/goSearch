@@ -1,11 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 )
 
 func main() {
@@ -23,7 +25,10 @@ func main() {
 		log.Println("Finished Loading apps")
 		log.Println(Apps)
 		for _, app := range Apps {
+			start := time.Now()
 			app.LoadIndexesFromDisk()
+			end := time.Now()
+			fmt.Println("Load index time", end.Sub(start))
 			log.Println("starting webservers...")
 			StartWebserver(app) // FIXME: HOLY SHIT THIS IS DUMB, need to update to pass app name in url
 		}
@@ -31,7 +36,10 @@ func main() {
 	<-c
 	log.Println("### Serializing apps and indexes before exiting...")
 	for _, app := range Apps {
+		start := time.Now()
 		app.SerializeIndex()
+		end := time.Now()
+		fmt.Println("Serialize index time", end.Sub(start))
 		app.SerializeApp()
 	}
 	os.Exit(1)
