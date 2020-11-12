@@ -1,0 +1,7 @@
+Switch everything from roaring bitmaps to orderedMaps
+
+The ordered map MUST be in the format of (score, docID). That was we can iterate quickly over the sorted scores. For updating/deleting 
+
+(score-docID, score) // compound primary key!!!!
+
+ADVANCED NOSQL PATTERNS IN SEARCH BABY LETS GO!!!

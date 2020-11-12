@@ -3,28 +3,43 @@ package main
 import (
 	"encoding/gob"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/armon/go-radix"
+	"github.com/elliotchance/orderedmap"
 	"io/ioutil"
 	"log"
+	"math"
 	"math/rand"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/RoaringBitmap/roaring/roaring64"
-	"github.com/armon/go-radix"
 )
 
+// =============================================================================
+// Globals
+// =============================================================================
+
+// Apps is the array of App Indexes
+var Apps map[string]*appIndexes
+
+// =============================================================================
+// Structs
+// =============================================================================
+
 type indexMap struct {
-	field string
-	index *radix.Tree
+	Field          string
+	index          *radix.Tree
+	TotalDocuments int
 }
 
 type appIndexes struct {
-	indexes []indexMap
-	name    string
+	Indexes        []indexMap
+	Name           string `json:"Name"`
+	TotalDocuments int    `json:"TotalDocuments"`
 }
 
 type fuzzyItem struct {
@@ -37,13 +52,30 @@ type listItem struct {
 	IndexValues []string
 }
 
+type DocumentObject struct {
+	Score float32                `json:"score"`
+	Data  map[string]interface{} `json:"data"`
+	DocID uint64                 `json:"docID"`
+}
+
+type SearchResponse struct {
+	Items      []DocumentObject `json:"items"`
+	SearchTime time.Duration    `json:"searchTimeNS"`
+	ScoreTime  time.Duration    `json:"scoreTimeNS"`
+	LoadTime   time.Duration    `json:"loadTimeNS"`
+}
+
 func initApp(name string) *appIndexes {
-	appindex := appIndexes{make([]indexMap, 0), name}
+	appindex := appIndexes{make([]indexMap, 0), name, 0}
+	if Apps == nil {
+		Apps = make(map[string]*appIndexes, 0)
+	}
+	Apps[name] = &appindex
 	return &appindex
 }
 
 func initIndexMap(indexmap *indexMap, name string) *indexMap {
-	newMap := indexMap{name, radix.New()}
+	newMap := indexMap{name, radix.New(), 0}
 	return &newMap
 }
 
@@ -65,50 +97,134 @@ func CheckDocumentsFolder() {
 	}
 }
 
-func LoadIndexesFromDisk(app *appIndexes) { // TODO: Change to search folders and load based on app
+func LoadAppsFromDisk() {
+	start := time.Now()
+	if _, err := os.Stat("./apps"); os.IsNotExist(err) { // Make sure serialized folder exists
+		os.Mkdir("./apps", os.FileMode(0755))
+	}
+	filepath.Walk("./apps", func(path string, info os.FileInfo, err error) error {
+		appName := filepath.Base(path)
+		if info == nil {
+			log.Printf("Error: ./apps/%s does not exist\n", appName)
+			return nil
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		appBytes, err := ioutil.ReadFile(path)
+		if err != nil {
+			panic(err)
+		}
+		var newApp appIndexes
+		json.Unmarshal(appBytes, &newApp)
+		newApp.Name = appName
+		Apps[appName] = &newApp
+		return nil
+	})
+	end := time.Now()
+	log.Printf("### Loaded serialized apps in %v\n", end.Sub(start))
+}
+
+func createOrderMapKey(docID uint64, score float32) string {
+	return fmt.Sprintf("%v#%v", score, docID)
+}
+
+func parseOrderMapKey(compoundKey string) (docID uint64, score float32) {
+	arr := strings.Split(compoundKey, "#")
+	theScore, _ := strconv.ParseFloat(arr[0], 32)
+	theDocID, _ := strconv.ParseUint(arr[1], 10, 64)
+	return theDocID, float32(theScore)
+}
+
+func (app *appIndexes) LoadIndexesFromDisk() { // TODO: Change to search folders and load based on app
 	start := time.Now()
 	if _, err := os.Stat("./serialized"); os.IsNotExist(err) { // Make sure serialized folder exists
 		os.Mkdir("./serialized", os.FileMode(0755))
 	}
-	if _, err := os.Stat(fmt.Sprintf("./serialized/%s", app.name)); os.IsNotExist(err) { // Make sure app folder exists
-		os.Mkdir(fmt.Sprintf("./serialized/%s", app.name), os.FileMode(0755))
+	if _, err := os.Stat(fmt.Sprintf("./serialized/%s", app.Name)); os.IsNotExist(err) { // Make sure app folder exists
+		os.Mkdir(fmt.Sprintf("./serialized/%s", app.Name), os.FileMode(0755))
 	}
-	filepath.Walk(fmt.Sprintf("./serialized/%s", app.name), func(path string, info os.FileInfo, err error) error {
+	filepath.Walk(fmt.Sprintf("./serialized/%s", app.Name), func(path string, info os.FileInfo, err error) error {
 		if info == nil {
-			fmt.Printf("Error: ./serialized/%s does not exist\n", app.name)
+			fmt.Printf("Error: ./serialized/%s does not exist\n", app.Name)
 			return nil
 		}
 		if info.IsDir() {
 			return nil
 		}
 		fieldName := filepath.Base(path)
-		indexInd := len(app.indexes)
-		app.addIndexMap(fieldName)
-
+		var indexInd int
+		// Find which index is field
+		for indx, indexx := range app.Indexes {
+			if indexx.Field == fieldName {
+				indexInd = indx
+				break
+			}
+		}
 		decodeFile, err := os.Open(path)
 		defer decodeFile.Close()
 		d := gob.NewDecoder(decodeFile)
-		decoded := make(map[string]*roaring64.Bitmap)
+		decoded := make(map[string]map[string]int)
 		err = d.Decode(&decoded)
-
 		converted := make(map[string]interface{})
-
 		for key, value := range decoded {
-			converted[key] = value
+			newOrdMap := convertNormalToOrderedMap(&value)
+			converted[key] = &newOrdMap
 		}
-
-		app.indexes[indexInd].index = radix.NewFromMap(converted)
+		app.Indexes[indexInd].index = radix.NewFromMap(converted)
 		return nil
 	})
 	end := time.Now()
 	log.Printf("### Loaded serialized indexes in %v\n", end.Sub(start))
-
 }
 
 func fetchDocument(docID uint64) string {
-	// TODO: Optimize to maybe not load this all into memory?
 	dat, _ := ioutil.ReadFile(fmt.Sprintf("./documents/%v", docID))
 	return string(dat)
+}
+
+func loadDocuments(docObjs *SearchResponse) {
+	for idx, docObj := range docObjs.Items {
+		docString := fetchDocument(docObj.DocID)
+		docObjs.Items[idx].Data, _ = parseArbJSON(docString)
+	}
+}
+
+// ListApps lists the names of current apps
+func ListApps() []string {
+	appArr := make([]string, 0)
+	for k, _ := range Apps {
+		appArr = append(appArr, k)
+	}
+	return appArr
+}
+
+func GetApp(appName string) (*appIndexes, error) {
+	app := Apps[appName]
+	if app == nil {
+		return nil, errors.New("App does not exist!")
+	} else {
+		return app, nil
+	}
+}
+
+// Dan's method uses less memory than https://play.golang.org/p/LjOrp4k6lqf because we aren't appending to an array (dan is faster on load but slower and serial)
+
+func convertOrderedToNormalMap(ordMap *orderedmap.OrderedMap) map[string]int {
+	output := make(map[string]int)
+	for el := ordMap.Front(); el != nil; el = el.Next() {
+		output[el.Key.(string)] = el.Value.(int)
+	}
+	return output
+}
+
+func convertNormalToOrderedMap(normMap *map[string]int) orderedmap.OrderedMap {
+	newMap := orderedmap.NewOrderedMap()
+	for key, value := range *normMap {
+		newMap.Set(key, value)
+	}
+	return *newMap
 }
 
 // ########################################################################
@@ -117,10 +233,9 @@ func fetchDocument(docID uint64) string {
 
 func (appIndex *appIndexes) listIndexItems() []listItem {
 	var output []listItem
-	for _, i := range appIndex.indexes {
-		newItem := listItem{i.field, make([]string, 0)}
+	for _, i := range appIndex.Indexes {
+		newItem := listItem{i.Field, make([]string, 0)}
 		i.index.Walk(func(k string, value interface{}) bool {
-			// v := value.(roaring64.Bitmap)
 			newItem.IndexValues = append(newItem.IndexValues, k)
 			return false
 		})
@@ -131,25 +246,30 @@ func (appIndex *appIndexes) listIndexItems() []listItem {
 
 func (appIndex *appIndexes) listIndexes() []string {
 	var output []string
-	for _, i := range appIndex.indexes {
-		output = append(output, i.field)
+	for _, i := range appIndex.Indexes {
+		output = append(output, i.Field)
 	}
 	return output
 }
 
 // addIndexMap creates a new index map (field) to be indexes
 func (appindex *appIndexes) addIndexMap(name string) *indexMap {
-	newIndexMap := indexMap{name, radix.New()}
-	appindex.indexes = append(appindex.indexes, newIndexMap)
-	return &newIndexMap
+	newIndexMap := indexMap{name, radix.New(), 0}
+	oldLen := len(appindex.Indexes)
+	appindex.Indexes = append(appindex.Indexes, newIndexMap)
+	return &appindex.Indexes[oldLen]
 }
 
 func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, filename string) (documentID uint64) {
-	// log.Println("### Adding index...")
 	// Format the input
 	rand.Seed(time.Now().UnixNano())
 	id, _ := strconv.ParseUint(filename, 10, 64)
-	// log.Println("### ID:", id)
+	var totalDocLen int
+	for _, v := range parsed {
+		totalDocLen += len(strings.FieldsFunc(v.(string), func(r rune) bool {
+			return r == ' ' || r == '"'
+		}))
+	}
 	for k, v := range parsed {
 		// Don't index ID
 		if strings.ToLower(k) == "docid" {
@@ -157,30 +277,26 @@ func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, file
 		}
 		// Find if indexMap already exists
 		var indexMapPointer *indexMap = nil
-		for i := 0; i < len(appindex.indexes); i++ {
-			if k == appindex.indexes[i].field {
-				indexMapPointer = &appindex.indexes[i]
+		for i := 0; i < len(appindex.Indexes); i++ {
+			if k == appindex.Indexes[i].Field {
+				indexMapPointer = &appindex.Indexes[i]
 				break
 			}
 		}
 
 		if indexMapPointer == nil { // Create indexMap
 			indexMapPointer = appindex.addIndexMap(k)
-			// log.Println("### Creating new indexMap")
 		}
 
 		// Add index to indexMap
-		indexMapPointer.addIndex(id, fmt.Sprintf("%v", v))
+		indexMapPointer.addIndex(id, fmt.Sprintf("%v", v), totalDocLen)
+
 	}
 	// Write indexes document to disk
 	fmt.Sprintf("Writing out to: %s\n", fmt.Sprintf("./documents/%v", id))
 	sendback, _ := stringIndex(parsed)
 	ioutil.WriteFile(fmt.Sprintf("./documents/%v", id), []byte(sendback), os.FileMode(0660))
 	return id
-
-	// TODO: Store document
-	// TODO: check if tree exists with name of every json key, if not create tree
-
 }
 
 func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID uint64) {
@@ -195,84 +311,219 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 		id = rand.Uint64()
 	}
 	// log.Println("### ID:", id)
+	var totalDocLen int
+	for k, v := range parsed {
+		if k == "docID" { // Ignore docID
+			continue
+		}
+		totalDocLen += len(strings.FieldsFunc(v.(string), func(r rune) bool {
+			return r == ' ' || r == '"'
+		}))
+	}
 	for k, v := range parsed {
 		// Don't index ID
 		if strings.ToLower(k) == "docid" {
 			continue
 		}
 		// Find if indexMap already exists
-		var indexMapPointer *indexMap = nil
-		for i := 0; i < len(appindex.indexes); i++ {
-			if k == appindex.indexes[i].field {
-				indexMapPointer = &appindex.indexes[i]
+		var indexMapPointer *indexMap
+		for i := 0; i < len(appindex.Indexes); i++ {
+			if k == appindex.Indexes[i].Field {
+				indexMapPointer = &appindex.Indexes[i]
 				break
 			}
 		}
 
 		if indexMapPointer == nil { // Create indexMap
 			indexMapPointer = appindex.addIndexMap(k)
-			// log.Println("### Creating new indexMap")
 		}
 
 		// Add index to indexMap
-		indexMapPointer.addIndex(id, fmt.Sprintf("%v", v))
+		indexMapPointer.addIndex(id, fmt.Sprintf("%v", v), totalDocLen)
 	}
 	// Remove docID field
 	delete(parsed, "docID")
+	appindex.TotalDocuments++ // Increase document count
 	// Write indexes document to disk
-	fmt.Sprintf("Writing out to: %s\n", fmt.Sprintf("./documents/%v", id))
 	sendback, _ := stringIndex(parsed)
 	ioutil.WriteFile(fmt.Sprintf("./documents/%v", id), []byte(sendback), os.FileMode(0660))
 	return id
-
-	// TODO: Store document
-	// TODO: check if tree exists with name of every json key, if not create tree
-
 }
 
-func (appindex *appIndexes) search(input string, fields []string, bw bool) (documentIDs []uint64, documents []string) {
-	var output []uint64
-	docs := make([]string, 0)
+func (appindex *appIndexes) search(input string, fields []string, bw bool) (documentIDs []uint64, response SearchResponse) {
+	output := make(map[uint64][]float32, 0) // docID: [score, docLen]
+	var avgDocLen float32
 	// Tokenize input
-	for _, token := range lowercaseTokens(tokenizeString(input)) {
+	start := time.Now()
+	searchTokens := lowercaseTokens(tokenizeString(input))
+	for _, token := range searchTokens { // Initial scoring pass, covers TF weighting and IDF weighting
 		// Check fields
 		if len(fields) == 0 { // check all
 			// log.Println("### No fields given, searching all fields...")
-			for _, indexmap := range appindex.indexes {
+			for _, indexmap := range appindex.Indexes {
 				// log.Println("### Searching index:", indexmap.field, "for", token)
 				if bw {
-					output = append(output, indexmap.beginsWithSearch(token)...)
+					searchItems := indexmap.beginsWithSearch(token)
+					for _, searchItem := range searchItems {
+						if searchItem != nil {
+							// FIXME: This is a hacky solution for getting number of docs with the term in it
+							numDocsWithTerm := 0
+							for el := searchItem.Front(); el != nil || numDocsWithTerm >= 100; el = el.Next() {
+								numDocsWithTerm++
+							}
+							// Only first 100 items in orderedmap
+							iterCount := 0
+							for el := searchItem.Front(); el != nil || iterCount >= 100; el = el.Next() {
+								docID, tfWeighting := parseOrderMapKey(el.Key.(string))
+								idfWeighting := math.Log(float64(1+indexmap.TotalDocuments) / float64(numDocsWithTerm))
+								fieldLen := float32(el.Value.(int))
+								newVal := make([]float32, 2)
+								if val, ok := output[docID]; ok { // Exists
+									prevScore := val[0]
+									prevLen := val[1]
+									newVal[0] = prevScore + (tfWeighting * float32(idfWeighting))
+									newVal[1] = prevLen + fieldLen
+									avgDocLen += fieldLen
+									output[docID] = newVal
+								} else {
+									newVal[0] = tfWeighting
+									newVal[1] = fieldLen
+									avgDocLen += fieldLen
+									output[docID] = newVal
+								}
+								iterCount++
+							}
+						}
+					}
 				} else {
-					output = append(output, indexmap.search(token)...)
+					searchItems := indexmap.search(token)
+					if searchItems != nil {
+						// FIXME: This is a hacky solution for getting number of docs with the term in it
+						numDocsWithTerm := 0
+						for el := searchItems.Front(); el != nil || numDocsWithTerm >= 100; el = el.Next() {
+							numDocsWithTerm++
+						}
+						// Only first 100 items in orderedmap
+						iterCount := 0
+						for el := searchItems.Front(); el != nil || iterCount >= 100; el = el.Next() {
+							docID, tfWeighting := parseOrderMapKey(el.Key.(string))
+							idfWeighting := math.Log(float64(1+indexmap.TotalDocuments) / float64(numDocsWithTerm))
+							fieldLen := float32(el.Value.(int))
+							newVal := make([]float32, 2)
+							if val, ok := output[docID]; ok { // Exists
+								prevScore := val[0]
+								prevLen := val[1]
+								newVal[0] = prevScore + (tfWeighting * float32(idfWeighting))
+								newVal[1] = prevLen
+								output[docID] = newVal
+							} else {
+								newVal[0] = tfWeighting
+								newVal[1] = fieldLen
+								avgDocLen += fieldLen
+								output[docID] = newVal
+							}
+							iterCount++
+						}
+					}
 				}
 			}
 		} else { // check given fields
 			for _, field := range fields {
 				// log.Println("### Searching index:", field, "for", token)
-				docIDs := appindex.searchByField(token, field, bw)
-				if docIDs == nil {
-					// log.Println("### Field doesn't exist:", field)
-					continue
+				searchItems := appindex.searchByField(token, field, bw)
+				for _, searchItem := range searchItems {
+					if searchItem != nil {
+						// FIXME: This is a hacky solution for getting number of docs with the term in it
+						numDocsWithTerm := 0
+						for el := searchItem.Front(); el != nil || numDocsWithTerm >= 100; el = el.Next() {
+							numDocsWithTerm++
+						}
+						// Only first 100 items in orderedmap
+						iterCount := 0
+						for el := searchItem.Front(); el != nil || iterCount >= 100; el = el.Next() {
+							docID, tfWeighting := parseOrderMapKey(el.Key.(string))
+							// FIXME: Currently does not cover the IDF weighting
+							fieldLen := float32(el.Value.(int))
+							newVal := make([]float32, 2)
+							if val, ok := output[docID]; ok { // Exists
+								prevScore := val[0]
+								prevLen := val[1]
+								newVal[0] = prevScore + tfWeighting
+								newVal[1] = prevLen + float32(fieldLen)
+								avgDocLen += float32(fieldLen)
+								output[docID] = newVal
+							} else {
+								newVal[0] = tfWeighting
+								newVal[1] = float32(fieldLen)
+								avgDocLen += float32(fieldLen)
+								output[docID] = newVal
+							}
+							iterCount++
+						}
+					}
 				}
-				output = append(output, docIDs...)
 			}
 		}
 	}
-	for _, docID := range output {
-		docs = append(docs, fetchDocument(docID))
+	responseObj := SearchResponse{
+		Items: make([]DocumentObject, 0),
 	}
-	return output, docs
+	end := time.Now()
+	diff := end.Sub(start)
+	responseObj.SearchTime = diff
+
+	// -------------------
+	// Scoring and Sorting
+	// -------------------
+
+	start = time.Now()
+
+	// Calculate avg doc len
+	avgDocLen = avgDocLen / float32(len(output)) // Get average
+
+	// Now we have docID: [score, docLen]
+	for docID, scoreLen := range output {
+		termsInQueryLen := len(strings.Fields(input))
+		finalDocScore := (scoreLen[0] / (scoreLen[1] / avgDocLen)) * float32(termsInQueryLen)
+		responseObj.Items = append(responseObj.Items, DocumentObject{
+			Data:  nil,
+			Score: finalDocScore,
+			DocID: docID,
+		})
+	}
+	sort.Slice(responseObj.Items, func(i int, j int) bool {
+		return responseObj.Items[i].Score > responseObj.Items[j].Score
+	})
+	// TODO: Only take first 100 documents for now
+	if len(responseObj.Items) > 100 {
+		responseObj.Items = responseObj.Items[:100]
+	}
+	end = time.Now()
+	responseObj.ScoreTime = end.Sub(start)
+
+	// -----------------
+	// Loading Documents
+	// -----------------
+
+	start = time.Now()
+	loadDocuments(&responseObj)
+	end = time.Now()
+	responseObj.LoadTime = end.Sub(start)
+	yeye := make([]uint64, 0) // FIXME: This is a temp solution obviously
+	return yeye, responseObj
 }
 
-func (appindex *appIndexes) searchByField(input string, field string, bw bool) (documentIDs []uint64) {
+func (appindex *appIndexes) searchByField(input string, field string, bw bool) (documents []*orderedmap.OrderedMap) {
 	// Check if field exists
-	var output []uint64
-	for _, indexmap := range appindex.indexes {
-		if indexmap.field == field {
+	output := make([]*orderedmap.OrderedMap, 0)
+	for _, indexmap := range appindex.Indexes {
+		if indexmap.Field == field {
 			if bw {
-				output = append(output, indexmap.beginsWithSearch(input)...)
+				searchItems := indexmap.beginsWithSearch(input)
+				output = append(output, searchItems...)
 			} else {
-				output = append(output, indexmap.search(input)...)
+				searchItems := indexmap.search(input)
+				output = append(output, searchItems)
 			}
 			break
 		}
@@ -280,29 +531,48 @@ func (appindex *appIndexes) searchByField(input string, field string, bw bool) (
 	return output
 }
 
+func (appindex *appIndexes) SerializeApp() {
+	log.Printf("### Serializing App: %s\n", appindex.Name)
+	if _, err := os.Stat("./apps"); os.IsNotExist(err) { // Make sure apps folder exists
+		os.Mkdir("./apps", os.FileMode(0755))
+	}
+	// Wipe tree since serializing tree elsewhere
+	// appindex.Indexes = nil
+	serializedApp, err := json.Marshal(appindex)
+	if err != nil {
+		panic(err)
+	}
+	ioutil.WriteFile(fmt.Sprintf("./apps/%s", appindex.Name), serializedApp, os.FileMode(0755))
+	log.Printf("### Successfully Serialized App %s!\n", appindex.Name)
+}
+
 func (appindex *appIndexes) SerializeIndex() {
-	log.Printf("### Serializing %s Index...\n", appindex.name)
+	// Check folders and such
+	log.Printf("### Serializing %s Indexes...\n", appindex.Name)
 	if _, err := os.Stat("./serialized"); os.IsNotExist(err) { // Make sure serialized folder exists
 		os.Mkdir("./serialized", os.FileMode(0755))
 	}
-	if _, err := os.Stat(fmt.Sprintf("./serialized/%s", appindex.name)); os.IsNotExist(err) { // Make sure app folder exists
-		os.Mkdir(fmt.Sprintf("./serialized/%s", appindex.name), os.FileMode(0755))
+	if _, err := os.Stat(fmt.Sprintf("./serialized/%s", appindex.Name)); os.IsNotExist(err) { // Make sure app folder exists
+		os.Mkdir(fmt.Sprintf("./serialized/%s", appindex.Name), os.FileMode(0755))
 	}
-	for _, i := range appindex.indexes {
+	// Do the serialization
+	for _, i := range appindex.Indexes {
 		serializedTree := i.index.ToMap()
-		encodeFile, err := os.Create(fmt.Sprintf("./serialized/%s/%s", appindex.name, i.field))
+		encodeFile, err := os.Create(fmt.Sprintf("./serialized/%s/%s", appindex.Name, i.Field))
 		if err != nil {
 			panic(err)
 		}
 		e := gob.NewEncoder(encodeFile)
-		converted := make(map[string]*roaring64.Bitmap)
+		converted := make(map[string]map[string]int)
 		for key, value := range serializedTree {
-			converted[key] = value.(*roaring64.Bitmap)
+			var restoreMap map[string]int
+			restoreMap = convertOrderedToNormalMap(value.(*orderedmap.OrderedMap))
+			converted[key] = restoreMap
 		}
 		err = e.Encode(converted)
 		encodeFile.Close()
 	}
-	log.Printf("### Successfully Serialized %s Index!\n", appindex.name)
+	log.Printf("### Successfully Serialized %s Indexes!\n", appindex.Name)
 }
 
 func (appindex *appIndexes) deleteIndex(docID uint64) error {
@@ -326,27 +596,29 @@ func (appindex *appIndexes) deleteIndex(docID uint64) error {
 			continue
 		}
 		// Find the field index
-		for i := 0; i < len(appindex.indexes); i++ {
-			if k == appindex.indexes[i].field {
-				indexmap := appindex.indexes[i]
+		for i := 0; i < len(appindex.Indexes); i++ {
+			if k == appindex.Indexes[i].Field {
+				indexmap := appindex.Indexes[i]
 				// Tokenize field
 				for _, token := range lowercaseTokens(tokenizeString(input)) {
-					prenode, _ := indexmap.index.Get(token)
-					var ids *roaring64.Bitmap
-					if prenode == nil { // somehow not indexed
-						log.Printf("### Error: field not indexes from disk document (deleteIndex)")
+					tokenMap, _ := indexmap.index.Get(token)
+					if tokenMap == nil { // somehow not indexed
+						log.Printf("### Error: field not indexes from disk document (deleteIndex)\n")
 						continue
 					} else { // update node
-						node := prenode.(*roaring64.Bitmap)
-						node.Remove(docID)
-						ids = node
-						if node.IsEmpty() {
+						docMap := tokenMap.(*orderedmap.OrderedMap)
+						documentTermScore := calculateTokenScoreByField(input, token, indexmap.TotalDocuments, docMap.Len())
+						deleted := docMap.Delete(createOrderMapKey(docID, documentTermScore))
+						if deleted != true {
+							log.Printf("### Error: Document entry not deleted for token %s\n", token)
+						}
+						if docMap.Len() == 0 {
 							_, deleted := indexmap.index.Delete(token) // this should delete the node if it is empty
 							if !deleted {
 								log.Printf("Node was not deleted\n")
 							}
 						} else {
-							_, updated := indexmap.index.Insert(token, ids)
+							_, updated := indexmap.index.Insert(token, docMap)
 							if !updated {
 								log.Printf("### SOMEHOW DIDN'T UPDATE WHEN DELETING INDEX ###\n")
 								continue
@@ -354,10 +626,12 @@ func (appindex *appIndexes) deleteIndex(docID uint64) error {
 						}
 					}
 				}
+				indexmap.TotalDocuments--
 				break
 			}
 		}
 	}
+	appindex.TotalDocuments--
 	// Delete document on disk
 	err = os.Remove(docPath)
 	if err != nil {
@@ -412,71 +686,73 @@ func FuzzySearch(key string, t *radix.Tree) []fuzzyItem {
 // ######################### indexMap functions ###########################
 // ########################################################################
 
-func (indexmap *indexMap) addIndex(id uint64, value string) {
+func calculateTokenScoreByField(fieldValue string, tokenValue string, totalDocuments int, orderMapLen int) (tokenScore float32) {
+	// BEGIN Precision word match
+	tokenPrecisionFreq := 0
+	docStringWord := strings.FieldsFunc(fieldValue, func(r rune) bool {
+		return r == ' ' || r == '"'
+	})
+	for _, word := range docStringWord {
+		if strings.ToLower(word) == tokenValue {
+			tokenPrecisionFreq++
+		}
+	}
+	termFreqWeight := 1 + (math.Log(1 + math.Log(1+float64(tokenPrecisionFreq))))
+	// END Precision word match
+	return float32(termFreqWeight)
+}
+
+func (indexmap *indexMap) addIndex(id uint64, value string, docLen int) {
 	CheckDocumentsFolder()
 	// Tokenize
 	for _, token := range lowercaseTokens(tokenizeString(value)) {
 		// log.Println("### INDEXING:", token)
 		// Check if index already exists
 		prenode, _ := indexmap.index.Get(token)
-		var ids *roaring64.Bitmap
+		var ids *orderedmap.OrderedMap
 		if prenode == nil { // create new node
-			ids = roaring64.BitmapOf(id)
+			ids = orderedmap.NewOrderedMap()
+			// Calculate token score here
+			documentTermScore := calculateTokenScoreByField(value, token, indexmap.TotalDocuments, ids.Len())
+			ids.Set(createOrderMapKey(id, documentTermScore), docLen)
 			_, updated := indexmap.index.Insert(token, ids)
 			if updated {
 				fmt.Errorf("### SOMEHOW UPDATED WHEN INSERTING NEW ###\n")
 			}
 			// log.Printf("### ADDED %v WITH IDS: %v ###\n", token, ids)
 		} else { // update node
-			node := prenode.(*roaring64.Bitmap)
-			node.Add(id)
+			node := prenode.(*orderedmap.OrderedMap)
 			ids = node
-			_, updated := indexmap.index.Insert(token, ids)
+			documentTermScore := calculateTokenScoreByField(value, token, indexmap.TotalDocuments, ids.Len())
+			node.Set(createOrderMapKey(id, documentTermScore), docLen)
+			_, updated := indexmap.index.Insert(token, node)
 			if !updated {
 				fmt.Errorf("### SOMEHOW DIDN'T UPDATE WHEN UPDATING INDEX ###\n")
 			}
 			// log.Printf("### UPDATED %v WITH IDS: %v ###\n", token, ids)
 		}
-		// if indexmap.index[token] != nil {
-		// 	var found bool = false
-		// 	for _, docID := range indexmap.index[token] {
-		// 		// log.Println("### Found token, Checking if doc exists...")
-		// 		if docID == id {
-		// 			// log.Println("### Skip to avoid duplicates")
-		// 			found = true
-		// 			break
-		// 		}
-		// 	}
-		// 	if found {
-		// 		continue
-		// 	}
-		// }
-		// indexmap.index[token] = append(indexmap.index[token], id)
 	}
+	indexmap.TotalDocuments++
 }
 
-// search returns an array of document ids
-func (indexmap *indexMap) search(input string) (documentIDs []uint64) {
-	var output []uint64
+func (indexmap *indexMap) search(input string) (documents *orderedmap.OrderedMap) {
 	search, _ := indexmap.index.Get(input)
 	if search == nil {
-		return output
+		return nil
 	}
-	node := search.(*roaring64.Bitmap)
-	output = append(output, node.ToArray()...)
-	return output
+	node := search.(*orderedmap.OrderedMap)
+	return node
 }
 
-func (indexmap *indexMap) beginsWithSearch(input string) (documentIDs []uint64) {
-	var output []uint64
+func (indexmap *indexMap) beginsWithSearch(input string) (documents []*orderedmap.OrderedMap) {
+	output := make([]*orderedmap.OrderedMap, 0)
 	count := 0
 	indexmap.index.WalkPrefix(input, func(key string, value interface{}) bool {
 		if count >= 100 {
 			return true
 		}
-		node := value.(*roaring64.Bitmap)
-		output = append(output, node.ToArray()...)
-		count++
+		node := value.(*orderedmap.OrderedMap)
+		output = append(output, node)
 		return false
 	})
 	return output

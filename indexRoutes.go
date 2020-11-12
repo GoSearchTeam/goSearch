@@ -14,11 +14,6 @@ type QueryBody struct {
 	BeginsWith bool     `json:"beginsWith"`
 }
 
-type SearchResponse struct {
-	DocIDs    []uint64      `json:"docIDs"`
-	Documents []interface{} `json:"documents"`
-}
-
 type AddMultipleIndex struct {
 	Items []map[string]interface{} `json:"items"`
 }
@@ -52,26 +47,20 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 		body := QueryBody{BeginsWith: false} // Default false if not included
 		c.BindJSON(&body)
 		var output []uint64 // temporary, will turn into documents later
-		documents := make([]string, 0)
 		// query := jDat["query"].(string)
 		query := body.Query
 		fields := body.Fields
 		bw := body.BeginsWith
+		var responseJSON SearchResponse
+		var res []uint64
 		if fields != nil { // Field(s) specified
-			res, docs := app.search(query, fields, bw)
+			res, responseJSON = app.search(query, fields, bw)
 			output = append(output, res...)
-			documents = append(documents, docs...)
 		} else {
-			res, docs := app.search(query, make([]string, 0), bw)
+			res, responseJSON = app.search(query, make([]string, 0), bw)
 			output = append(output, res...)
-			documents = append(documents, docs...)
 		}
-		jsonDocs := make([]interface{}, 0)
-		for _, doc := range documents {
-			parsed, _ := parseArbJSON(doc)
-			jsonDocs = append(jsonDocs, parsed)
-		}
-		c.JSON(200, SearchResponse{output, jsonDocs})
+		c.JSON(200, responseJSON)
 	})
 
 	r.POST("/index/add", func(c *gin.Context) {
