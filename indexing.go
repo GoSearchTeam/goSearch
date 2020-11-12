@@ -13,7 +13,6 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -160,7 +159,6 @@ func (app *appIndexes) LoadIndexesFromDisk() { // TODO: Change to search folders
 		for indx, indexx := range app.Indexes {
 			if indexx.Field == fieldName {
 				indexInd = indx
-				fmt.Println("found index ind", indx, "for", fieldName)
 				break
 			}
 		}
@@ -169,18 +167,12 @@ func (app *appIndexes) LoadIndexesFromDisk() { // TODO: Change to search folders
 		d := gob.NewDecoder(decodeFile)
 		decoded := make(map[string]map[string]int)
 		err = d.Decode(&decoded)
-		// fmt.Println("deoced", decoded)
 		converted := make(map[string]interface{})
 		for key, value := range decoded {
 			newOrdMap := convertNormalToOrderedMap(&value)
 			converted[key] = &newOrdMap
-			// fmt.Println(key, "ex", newOrdMap.Front().Key, newOrdMap.Front().Value, reflect.TypeOf(newOrdMap.Front().Key), reflect.TypeOf(newOrdMap.Front().Value))
 		}
-		fmt.Println("converted:", reflect.TypeOf(converted))
 		app.Indexes[indexInd].index = radix.NewFromMap(converted)
-		fmt.Println("$$$$ Total", app.Indexes)
-		fmt.Println("$$$$ INDEX TOTAL DOCS", app.Indexes[indexInd].TotalDocuments, app.Indexes[indexInd].Field)
-		// app.Indexes[indexInd].TotalDocuments = len(converted)
 		return nil
 	})
 	end := time.Now()
@@ -392,7 +384,6 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 							for el := searchItem.Front(); el != nil || iterCount >= 100; el = el.Next() {
 								docID, tfWeighting := parseOrderMapKey(el.Key.(string))
 								idfWeighting := math.Log(float64(1+indexmap.TotalDocuments) / float64(numDocsWithTerm))
-								fmt.Println("totaldocs", indexmap.TotalDocuments)
 								fieldLen := float32(el.Value.(int))
 								newVal := make([]float32, 2)
 								if val, ok := output[docID]; ok { // Exists
@@ -425,7 +416,6 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 						for el := searchItems.Front(); el != nil || iterCount >= 100; el = el.Next() {
 							docID, tfWeighting := parseOrderMapKey(el.Key.(string))
 							idfWeighting := math.Log(float64(1+indexmap.TotalDocuments) / float64(numDocsWithTerm))
-							fmt.Println("totaldocs", indexmap.TotalDocuments)
 							fieldLen := float32(el.Value.(int))
 							newVal := make([]float32, 2)
 							if val, ok := output[docID]; ok { // Exists
@@ -502,7 +492,6 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 	// Now we have docID: [score, docLen]
 	for docID, scoreLen := range output {
 		termsInQueryLen := len(strings.Fields(input))
-		fmt.Println(docID, scoreLen[1], avgDocLen, termsInQueryLen, scoreLen[0])
 		finalDocScore := (scoreLen[0] / (scoreLen[1] / avgDocLen)) * float32(termsInQueryLen)
 		responseObj.Items = append(responseObj.Items, DocumentObject{
 			Data:  nil,
@@ -586,7 +575,6 @@ func (appindex *appIndexes) SerializeIndex() {
 		for key, value := range serializedTree {
 			var restoreMap map[string]int
 			restoreMap = convertOrderedToNormalMap(value.(*orderedmap.OrderedMap))
-			fmt.Println("restoremap", restoreMap)
 			converted[key] = restoreMap
 		}
 		err = e.Encode(converted)
