@@ -186,8 +186,6 @@ func fetchDocument(docID uint64) string {
 
 func loadDocuments(docObjs *SearchResponse) {
 	for idx, docObj := range docObjs.Items {
-		// Determine precision of document
-		// Determine recall of document
 		docString := fetchDocument(docObj.DocID)
 		docObjs.Items[idx].Data, _ = parseArbJSON(docString)
 	}
@@ -263,11 +261,9 @@ func (appindex *appIndexes) addIndexMap(name string) *indexMap {
 }
 
 func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, filename string) (documentID uint64) {
-	// log.Println("### Adding index...")
 	// Format the input
 	rand.Seed(time.Now().UnixNano())
 	id, _ := strconv.ParseUint(filename, 10, 64)
-	// log.Println("### ID:", id)
 	var totalDocLen int
 	for _, v := range parsed {
 		totalDocLen += len(strings.FieldsFunc(v.(string), func(r rune) bool {
@@ -290,7 +286,6 @@ func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, file
 
 		if indexMapPointer == nil { // Create indexMap
 			indexMapPointer = appindex.addIndexMap(k)
-			// log.Println("### Creating new indexMap")
 		}
 
 		// Add index to indexMap
@@ -302,10 +297,6 @@ func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, file
 	sendback, _ := stringIndex(parsed)
 	ioutil.WriteFile(fmt.Sprintf("./documents/%v", id), []byte(sendback), os.FileMode(0660))
 	return id
-
-	// TODO: Store document
-	// TODO: check if tree exists with name of every json key, if not create tree
-
 }
 
 func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID uint64) {
@@ -345,7 +336,6 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 
 		if indexMapPointer == nil { // Create indexMap
 			indexMapPointer = appindex.addIndexMap(k)
-			// log.Println("### Creating new indexMap")
 		}
 
 		// Add index to indexMap
@@ -355,7 +345,6 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 	delete(parsed, "docID")
 	appindex.TotalDocuments++ // Increase document count
 	// Write indexes document to disk
-	// fmt.Printf("Writing out to: %s\n", fmt.Sprintf("./documents/%v", id))
 	sendback, _ := stringIndex(parsed)
 	ioutil.WriteFile(fmt.Sprintf("./documents/%v", id), []byte(sendback), os.FileMode(0660))
 	return id
