@@ -321,7 +321,10 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 	}
 	// log.Println("### ID:", id)
 	var totalDocLen int
-	for _, v := range parsed {
+	for k, v := range parsed {
+		if k == "docID" { // Ignore docID
+			continue
+		}
 		totalDocLen += len(strings.FieldsFunc(v.(string), func(r rune) bool {
 			return r == ' ' || r == '"'
 		}))
