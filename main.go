@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"io"
 	"log"
 	"os"
@@ -10,9 +11,20 @@ import (
 	"time"
 )
 
+var (
+	logger *logrus.Logger
+)
+
 func main() {
 	syscall.Umask(0) // file mode perms
-	logFile, _ := os.OpenFile("logs.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0755)
+	logFile, _ := os.OpenFile("process.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+	eventFile, err := os.OpenFile("events.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		log.Fatal(err)
+	}
+	logger = logrus.New()
+	logger.SetFormatter(&logrus.JSONFormatter{})
+	logger.SetOutput(eventFile)
 	mw := io.MultiWriter(os.Stdout, logFile)
 	log.SetOutput(mw)
 	c := make(chan os.Signal, 1)
