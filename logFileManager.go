@@ -9,7 +9,10 @@ import (
 )
 
 func monitorFileSize() {
-
+	for true {
+		time.Sleep(time.Second * 60) // Every minute
+		checkFileSize()
+	}
 }
 
 func checkFileSize() {
@@ -21,7 +24,6 @@ func checkFileSize() {
 	}
 	if stat.Size() > 10000000 { // TODO: Make customizable in config, default 10MB
 		// rotate the file
-		fmt.Println("### ROTATING FILE")
 		newFileName := fmt.Sprintf("events-%s.log", time.Now().Format("2006-01-02_15-04-05"))
 		os.Rename("events.log", newFileName)
 		os.Create("events.log")

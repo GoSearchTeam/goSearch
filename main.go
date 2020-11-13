@@ -29,11 +29,9 @@ func main() {
 	logger.SetOutput(eventFile)
 	mw := io.MultiWriter(os.Stdout, logFile)
 	log.SetOutput(mw)
-	logger.WithFields(logrus.Fields{
-		"test": "this is a test of a very long string",
-	}).Info("very long message hhahah")
-	logger.Info("this is something")
-	checkFileSize()
+	// Start log file rotation
+	go monitorFileSize()
+
 	// Apps
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
