@@ -1,0 +1,34 @@
+name: Go
+
+on: [push, pull_request]
+
+jobs:
+
+  build:
+    name: Build_and_test
+    runs-on: ubuntu-latest
+    steps:
+
+    - name: Set up Go 1.x
+      uses: actions/setup-go@v2
+      with:
+        go-version: ^1.15
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Install
+      run: make install
+
+    - name: Build
+      run: make build
+
+    - name: Test
+      run: make test
+
+    - name: Log Docs
+      if: ${{ failure() }}
+      run: |
+        echo Documents reamining after failure...
+        find ./documents/ -type f | xargs tail -n +1
+        echo
