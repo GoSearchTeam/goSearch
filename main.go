@@ -17,6 +17,8 @@ var (
 
 func main() {
 	syscall.Umask(0) // file mode perms
+
+	// Logger
 	logFile, _ := os.OpenFile("process.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 	eventFile, err := os.OpenFile("events.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
@@ -27,6 +29,12 @@ func main() {
 	logger.SetOutput(eventFile)
 	mw := io.MultiWriter(os.Stdout, logFile)
 	log.SetOutput(mw)
+	logger.WithFields(logrus.Fields{
+		"test": "this is a test of a very long string",
+	}).Info("very long message hhahah")
+	logger.Info("this is something")
+	checkFileSize()
+	// Apps
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 	initApp("Example App") // For testing
