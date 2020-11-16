@@ -47,13 +47,7 @@ const uploadTest = async (rounds) => {
 const searchItem = async (fieldName, itemField) => {
   const start = process.hrtime.bigint()
   const resp = await fetch(`http://${process.env.HOSTNAME}:9200/testindex/_search?q=${fieldName}:${itemField}`, {
-    method: 'GET',
-    headers: {
-      'content-type': 'application/json'
-    },
-    body: JSON.stringify({
-      query: itemField
-    })
+    method: 'GET'
   })
   if (resp.status > 299) {
     console.log(await resp.text())
