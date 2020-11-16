@@ -77,15 +77,14 @@ const searchTest = async () => {
   }
   for (let i = 0; i < 1000; i++) {
     // get random item field
-    console.log(items[i])
     const theKey = randomProperty(items[i])
     await searchItem(theKey, items[i][theKey])
   }
 }
 
 const main = async () => {
-  await uploadTest(100000)
-  // await searchTest()
+  // await uploadTest(100000)
+  await searchTest()
 }
 
 main()
