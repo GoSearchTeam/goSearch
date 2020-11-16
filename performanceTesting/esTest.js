@@ -58,7 +58,7 @@ const searchItem = async (fieldName, itemField) => {
 }
 
 const randomProperty = function (obj) {
-  delete obj.signup
+  delete obj.signup // ES doesn't like how this is formatted when using GET requests
   const keys = Object.keys(obj)
   return obj[keys[keys.length * Math.random() << 0]]
 }
