@@ -231,19 +231,6 @@ func convertNormalToOrderedMap(normMap *map[string]int) orderedmap.OrderedMap {
 // ######################## appIndexes functions ##########################
 // ########################################################################
 
-func (appIndex *appIndexes) listIndexItems() []listItem {
-	var output []listItem
-	for _, i := range appIndex.Indexes {
-		newItem := listItem{i.Field, make([]string, 0)}
-		i.index.Walk(func(k string, value interface{}) bool {
-			newItem.IndexValues = append(newItem.IndexValues, k)
-			return false
-		})
-		output = append(output, newItem)
-	}
-	return output
-}
-
 func (appIndex *appIndexes) listIndexes() []string {
 	var output []string
 	for _, i := range appIndex.Indexes {
