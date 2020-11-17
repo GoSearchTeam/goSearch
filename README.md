@@ -13,6 +13,7 @@ Full-Text Search Engine Written in Go
     - [Ranking and Sorting](#ranking-and-sorting)
     - [Why NoSQL Search?](#why-nosql-search)
     - [Test 1 - A Primitive Test](#test-1---a-primitive-test)
+    - [Test 2 - A Single Node Comparative Test](#test-2---a-single-node-comparative-test)
 
 ## Features
 
@@ -74,3 +75,23 @@ GoSearch tackles the same problems for search that DBs like Cassandra and Dyanmo
 _Note: These tests were performed on a MacBook Pro, while in a Zoom call and running lots of other apps. This test is primitive and should be no indication of full performance capabilities. The requests and GoSearch were on the same device (localhost network). This test is also pre-GoodLists._
 
 A Zoom call was opened at ~2.5 million documents stored, which you can see a visible change in dispersion of latencies.
+
+This test was run before implemented NoSQL techniques and `OrderedMaps`
+
+#### Test 2 - A Single Node Comparative Test
+![GoSearch Testing2-es](/assets/GoSearch%20Testing2-es.png)
+
+This test was run on a single node cloud environment. Quickly summarizing some of the test results:
+
+- 100k documents, 1k searches
+- Average Document Add Request Time: `0.782ms`
+- Average Document Search Request Time: `0.822ms`
+- Over 2x performance boost over ElasticSearch running the same test on the same hardware
+- Consistently kept HTTP requests under `1ms` in same AZ and VPC
+- Request time was far less volatile than ElasticSearch, and average request time actually decreased over time.
+- No repeated documents or searches were performed in this test
+- Requests were initiated immediately after the previous request responded
+
+This test shows seriously promising results. We can see the advantage of the NoSQL techniques and preemptive scoring and sorting. By doing a lot of the work during the add operation (which we are even faster in!), we save lots of time during the search operations.
+
+Obviously 100k documents is a relatively small amount, and a single node is not practical for production. In further tests we will see how a clustered environment performs.
