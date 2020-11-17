@@ -12,7 +12,7 @@ function App() {
           Go Search (Admin Land)
         </header>
         <Switch>
-          <Route path="/admin">
+          <Route path="/admin/login">
             <LoginPage></LoginPage>
           </Route>
           <Route path="/admin/dashboard">
