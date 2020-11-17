@@ -1,5 +1,7 @@
 build:
-	go build .
+	go build .; \
+	  cd frontend; \
+	  npm run build;
 
 install:
 	go install .
