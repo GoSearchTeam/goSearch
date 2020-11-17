@@ -5,4 +5,6 @@ moviedata.json
 documents
 serialized
 *.log
+*.zip
 apps
+node_modules
