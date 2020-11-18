@@ -1,7 +1,7 @@
 // import './App.css';
 import { Form, Button, Col } from 'react-bootstrap'
 
-export default function Dashboard (props) {
+export default function Managment (props) {
   return (
     <>
       <Form>
