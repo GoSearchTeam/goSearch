@@ -471,7 +471,7 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 	// Now we have docID: [score, docLen]
 	for docID, scoreLen := range output {
 		termsInQueryLen := len(strings.Fields(input))
-		finalDocScore := (scoreLen[0] / (scoreLen[1] / avgDocLen)) * float32(termsInQueryLen)
+		finalDocScore := (scoreLen[0] / ((1 - 0.1) * 0.1 * scoreLen[1] / (avgDocLen))) * float32(termsInQueryLen) // Length normalization and IDF weighting
 		responseObj.Items = append(responseObj.Items, DocumentObject{
 			Data:  nil,
 			Score: finalDocScore,
