@@ -37,7 +37,7 @@ func main() {
 
 	// Activate Clustering
 	if *ClusterMode {
-		BeginClusterDiscovery()
+		BeginClustering()
 	}
 
 	// Apps
@@ -61,6 +61,8 @@ func main() {
 		}
 	}()
 	<-c
+	log.Println("### Leaving Gossip")
+	LeaveGossipCluster()
 	log.Println("### Serializing apps and indexes before exiting...")
 	for _, app := range Apps {
 		start := time.Now()

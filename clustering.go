@@ -2,12 +2,15 @@ package main
 
 import (
 	// "encoding/json"
-	"context"
+	"bufio"
 	"github.com/perlin-network/noise"
 	// "github.com/perlin-network/noise/kademlia"
+	"fmt"
+	"io"
 	"log"
 	"net"
 	"strings"
+	"time"
 	// "net/http"
 )
 
@@ -16,7 +19,7 @@ var (
 	MyGlobalCluster *GlobalCluster
 	MyClusterNode   *ClusterNode
 	AllNodesButMe   []*ClusterNode
-	TestNode        *noise.Node
+	GossipServer    net.Listener
 )
 
 // GlobalCluster A total cluster
@@ -53,32 +56,112 @@ type ClusterDiscoverResponse struct {
 	}
 }
 
-func BeginClusterDiscovery() {
+func handleConnection(c net.Conn) {
+	fmt.Printf("Serving %s\n", c.RemoteAddr().String())
+	c.SetReadDeadline(time.Now().Add(time.Second * 3))
+	defer func() {
+		c.Write([]byte("Read Timeout!\n"))
+		fmt.Printf("Closing connection to %s\n", c.RemoteAddr().String())
+		c.Close()
+	}()
+	for {
+		request, err := bufio.NewReader(c).ReadString('\n')
+		switch err {
+		case nil:
+			clientRequest := strings.TrimSpace(string(request))
+			if clientRequest == ":QUIT" {
+				log.Println("client requested server to close the connection so closing")
+				c.Close()
+				return
+			} else {
+				log.Println(clientRequest)
+			}
+		case io.EOF:
+			log.Println("client closed the connection by terminating the process")
+			return
+		default:
+			log.Printf("error: %v\n", err)
+			return
+		}
+		result := "heyyy\n"
+		c.Write([]byte(string(result)))
+	}
+}
+
+func StartGossipServer() {
+	var err error
+	GossipServer, err = net.Listen("tcp4", fmt.Sprintf("%s:%d", *NodeInterface, *NodePort))
+	if err != nil {
+		panic(err)
+	}
+	go func() {
+		for {
+			c, err := GossipServer.Accept()
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			go handleConnection(c)
+		}
+	}()
+}
+
+func SendGossipMessage(nodeAddr string) {
+	con, err := net.Dial("tcp4", nodeAddr)
+	defer con.Close()
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer con.Close()
+
+	serverReader := bufio.NewReader(con)
+
+	switch err {
+	case nil:
+		if _, err = con.Write([]byte("I am alive\n")); err != nil {
+			log.Printf("failed to send the client request: %v\n", err)
+		}
+	case io.EOF:
+		log.Println("client closed the connection")
+		return
+	default:
+		log.Printf("client error: %v\n", err)
+		return
+	}
+
+	// Waiting for the server response
+	serverResponse, err := serverReader.ReadString('\n')
+
+	switch err {
+	case nil:
+		log.Println("Got from server:", strings.TrimSpace(serverResponse))
+	case io.EOF:
+		log.Println("server closed the connection")
+		return
+	default:
+		log.Printf("server error: %v\n", err)
+		return
+	}
+}
+
+func BeginClustering() {
+	StartGossipServer()
 	log.Println("Beginning cluster discovery...")
-	netIP := net.ParseIP(*NodeInterface)
-	TestNode, _ = noise.NewNode(noise.WithNodeBindHost(netIP), noise.WithNodeBindPort(uint16(*NodePort)))
-	// overlay := kademlia.New()
-	// TestNode.Bind(overlay.Protocol())
-	TestNode.Listen()
-	log.Println("Node listening on:", TestNode.Addr())
-	TestNode.Handle(func(ctx noise.HandlerContext) error {
-		log.Printf("Got a message from Bob: '%s'\n", string(ctx.Data()))
-		return nil
-	})
-	log.Println("handle...")
 	if *FellowNodes != "" {
 		nodeList := strings.Split(*FellowNodes, ",")
 		log.Println("Nodelist:", nodeList)
 		for _, node := range nodeList {
 			log.Println("sending messag to", node)
-			err := TestNode.Send(context.TODO(), node, []byte("hey"))
-			if err != nil {
-				panic(err)
-			}
+			SendGossipMessage(node)
 		}
 	} else {
 		log.Println("No other nodes")
 	}
+}
+
+func LeaveGossipCluster() {
+	// TODO: Broadcast leave
+	GossipServer.Close()
 }
 
 // func initCluster() *GlobalCluster {
