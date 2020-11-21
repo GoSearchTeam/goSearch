@@ -1,21 +1,18 @@
 package main
 
 import (
-	// "encoding/json"
 	"bufio"
-	"github.com/perlin-network/noise"
-	// "github.com/perlin-network/noise/kademlia"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net"
 	"strings"
 	"time"
-	// "net/http"
 )
 
 var (
-	MyLocalCluster  *LocalCluster
+	MyLocalCluster  *LocalClusterGroup
 	MyGlobalCluster *GlobalCluster
 	MyClusterNode   *ClusterNode
 	AllNodesButMe   []*ClusterNode
@@ -30,20 +27,20 @@ type GlobalCluster struct {
 	ID                string // ID of the global cluster
 }
 
-type LocalCluster struct {
-	ID        string // ID of the local cluster
-	NodeCount int    // How many nodes in local cluster
-	Name      string // Name of the local cluster
+type LocalClusterGroup struct {
+	ID        string         // ID of the local cluster
+	NodeCount int            // How many nodes in local cluster
+	Name      string         // Name of the local cluster
+	Nodes     []*ClusterNode // Nodes in the cluster
 }
 
 // ClusterNode A single node within a Cluster
 type ClusterNode struct {
-	LocalCluster  *LocalCluster  // Parent local cluster
+	LocalCluster  string         // Parent local cluster
 	GlobalCluster *GlobalCluster // Parent global cluster
 	IP            string         // IP Address of the node
 	Port          int            // Port of the node
 	Name          string         // Name of the node
-	NoiseNode     *noise.Node
 }
 
 // ClusterDiscoverResponse The response struct from discovering nodes
@@ -56,35 +53,111 @@ type ClusterDiscoverResponse struct {
 	}
 }
 
+type GossipMessage struct {
+	Type string `json:"type"`
+	Data []byte `json:"data"` // Data JSON depends on the type
+}
+
+type GossipMessageTypeHello struct { // GossipMessage.Type == "hello"
+	LocalCluster string `json:"localCluster"`
+	Port         int    `json:"port"`
+	Name         string `json:"name"`
+}
+
+func InitMyNode() {
+	MyClusterNode = &ClusterNode{
+		LocalCluster: *LocalClusterName,
+		IP:           *NodeInterface,
+		Port:         *NodePort,
+		Name:         "testname",
+	}
+	MyLocalCluster = &LocalClusterGroup{
+		Name:      *LocalClusterName,
+		NodeCount: 1,
+		Nodes:     append(make([]*ClusterNode, 0), MyClusterNode),
+	}
+}
+
+func addNodeToCluster(localCluster string, port int, name string, tcpAddr *net.TCPAddr) error {
+	newNode := &ClusterNode{
+		LocalCluster: localCluster,
+		IP:           tcpAddr.IP.String(),
+		Port:         port,
+		Name:         name,
+	}
+	AllNodesButMe = append(AllNodesButMe, newNode)
+	if localCluster == MyClusterNode.LocalCluster {
+		MyLocalCluster.Nodes = append(MyLocalCluster.Nodes)
+	}
+	return nil
+}
+
+func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
+
+	switch gospMsg.Type {
+	case "hello":
+		log.Println("New node just waved hello!")
+		var gospMsgData GossipMessageTypeHello
+		err := json.Unmarshal(gospMsg.Data, &gospMsgData)
+		if err != nil {
+			panic(err)
+		}
+		clientIP, ok := c.RemoteAddr().(*net.TCPAddr)
+		if !ok {
+			panic("Could not get TCPAddr!")
+		}
+		err = addNodeToCluster(gospMsgData.LocalCluster, gospMsgData.Port, gospMsgData.Name, clientIP)
+		if err != nil {
+			panic(err)
+		}
+		c.Write([]byte("got it\n"))
+	default:
+		log.Println("Unrecognized message")
+		c.Write([]byte("Unrecognized message\n"))
+		// c.Close()
+		// return
+	}
+}
+
 func handleConnection(c net.Conn) {
 	fmt.Printf("Serving %s\n", c.RemoteAddr().String())
 	c.SetReadDeadline(time.Now().Add(time.Second * 3))
-	defer func() {
-		c.Write([]byte("Read Timeout!\n"))
-		fmt.Printf("Closing connection to %s\n", c.RemoteAddr().String())
-		c.Close()
-	}()
-	for {
-		request, err := bufio.NewReader(c).ReadString('\n')
-		switch err {
-		case nil:
-			clientRequest := strings.TrimSpace(string(request))
-			if clientRequest == ":QUIT" {
-				log.Println("client requested server to close the connection so closing")
-				c.Close()
-				return
-			} else {
-				log.Println(clientRequest)
-			}
-		case io.EOF:
-			log.Println("client closed the connection by terminating the process")
-			return
-		default:
-			log.Printf("error: %v\n", err)
-			return
-		}
-		result := "heyyy\n"
-		c.Write([]byte(string(result)))
+	// defer func() {
+	// 	c.Write([]byte("Read Timeout!\n"))
+	// 	fmt.Printf("Closing connection to %s\n", c.RemoteAddr().String())
+	// 	c.Close()
+	// }()
+
+	// request, err := bufio.NewReader(c).ReadString('\n')
+	// result := "heyyy\n"
+	// c.Write([]byte(string(result)))
+	// }
+
+	var gospMsg GossipMessage
+	decoder := json.NewDecoder(c)
+	err := decoder.Decode(&gospMsg)
+	if err != nil {
+		log.Println("Uh oh!")
+		panic(err)
+	}
+	// for {
+	switch err {
+	case nil:
+		// clientRequest := strings.TrimSpace(string(request))
+		// if clientRequest == ":QUIT" {
+		// 	log.Println("client requested server to close the connection so closing")
+		// 	c.Close()
+		// 	return
+		// } else {
+		// 	handleGossipMessage(&clientRequest, c)
+		// }
+		handleGossipMessage(gospMsg, c)
+	case io.EOF:
+		log.Println("client closed the connection by terminating the process")
+		return
+	default:
+		log.Printf("error: %v\n", err)
+		return
 	}
 }
 
@@ -98,6 +171,7 @@ func StartGossipServer() {
 		for {
 			c, err := GossipServer.Accept()
 			if err != nil {
+				fmt.Println("server err:")
 				fmt.Println(err)
 				return
 			}
@@ -108,8 +182,8 @@ func StartGossipServer() {
 
 func SendGossipMessage(nodeAddr string) {
 	con, err := net.Dial("tcp4", nodeAddr)
-	defer con.Close()
 	if err != nil {
+		log.Println("Could not connect to fellow node!")
 		log.Fatalln(err)
 	}
 	defer con.Close()
@@ -118,9 +192,31 @@ func SendGossipMessage(nodeAddr string) {
 
 	switch err {
 	case nil:
-		if _, err = con.Write([]byte("I am alive\n")); err != nil {
+		data := GossipMessageTypeHello{
+			LocalCluster: MyClusterNode.LocalCluster,
+			Name:         MyClusterNode.Name,
+			Port:         MyClusterNode.Port,
+		}
+		msgData, err := json.Marshal(data)
+		if err != nil {
+			panic(err)
+		}
+		msg := GossipMessage{
+			Data: msgData,
+			Type: "hello",
+		}
+		jsonData, err := json.Marshal(msg)
+		if err != nil {
+			panic(err)
+		}
+		log.Println("sending", string(jsonData))
+		if _, err = con.Write([]byte(string(jsonData) + "\n")); err != nil {
 			log.Printf("failed to send the client request: %v\n", err)
 		}
+		log.Println("newline")
+		// if _, err = con.Write([]byte("\n")); err != nil {
+		// 	log.Printf("failed to send the client request: %v\n", err)
+		// }
 	case io.EOF:
 		log.Println("client closed the connection")
 		return
@@ -142,6 +238,7 @@ func SendGossipMessage(nodeAddr string) {
 		log.Printf("server error: %v\n", err)
 		return
 	}
+	con.Close()
 }
 
 func BeginClustering() {
@@ -151,7 +248,6 @@ func BeginClustering() {
 		nodeList := strings.Split(*FellowNodes, ",")
 		log.Println("Nodelist:", nodeList)
 		for _, node := range nodeList {
-			log.Println("sending messag to", node)
 			SendGossipMessage(node)
 		}
 	} else {

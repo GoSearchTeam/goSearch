@@ -15,5 +15,6 @@ func StartWebserver(app *appIndexes) {
 	HandleTestRoutes(r)
 	HandleIndexRoutes(r, app)
 	HandleWebsocketRoutes(r, app)
+	HandleClusterRoutes(r)
 	r.Run(fmt.Sprintf("localhost:%d", *APIPort))
 }

@@ -36,6 +36,7 @@ func main() {
 	ParseFlags()
 
 	// Activate Clustering
+	InitMyNode()
 	if *ClusterMode {
 		BeginClustering()
 	}
