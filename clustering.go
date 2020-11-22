@@ -15,7 +15,7 @@ var (
 	MyLocalCluster  *LocalClusterGroup
 	MyGlobalCluster *GlobalCluster
 	MyClusterNode   *ClusterNode
-	AllNodesButMe   []*ClusterNode
+	AllNodes        map[string]*ClusterNode
 	GossipServer    net.Listener
 )
 
@@ -28,10 +28,10 @@ type GlobalCluster struct {
 }
 
 type LocalClusterGroup struct {
-	ID        string         // ID of the local cluster
-	NodeCount int            // How many nodes in local cluster
-	Name      string         // Name of the local cluster
-	Nodes     []*ClusterNode // Nodes in the cluster
+	ID        string                  // ID of the local cluster
+	NodeCount int                     // How many nodes in local cluster
+	Name      string                  // Name of the local cluster
+	Nodes     map[string]*ClusterNode // Nodes in the cluster
 }
 
 // ClusterNode A single node within a Cluster
@@ -65,29 +65,36 @@ type GossipMessageTypeHello struct { // GossipMessage.Type == "hello"
 }
 
 func InitMyNode() {
+	AllNodes = make(map[string]*ClusterNode)
 	MyClusterNode = &ClusterNode{
 		LocalCluster: *LocalClusterName,
 		IP:           *NodeInterface,
 		Port:         *NodePort,
-		Name:         "testname",
+		Name:         fmt.Sprintf("%s-%v", *NodeInterface, *NodePort),
 	}
+	AllNodes[MyClusterNode.Name] = MyClusterNode
+	initMap := make(map[string]*ClusterNode)
+	initMap[MyClusterNode.Name] = MyClusterNode
 	MyLocalCluster = &LocalClusterGroup{
 		Name:      *LocalClusterName,
 		NodeCount: 1,
-		Nodes:     append(make([]*ClusterNode, 0), MyClusterNode),
+		Nodes:     initMap,
 	}
 }
 
 func addNodeToCluster(localCluster string, port int, name string, tcpAddr *net.TCPAddr) error {
+	if _, ok := AllNodes[name]; ok {
+		log.Println("New node pretending to be old node")
+	}
 	newNode := &ClusterNode{
 		LocalCluster: localCluster,
 		IP:           tcpAddr.IP.String(),
 		Port:         port,
 		Name:         name,
 	}
-	AllNodesButMe = append(AllNodesButMe, newNode)
+	AllNodes[name] = newNode
 	if localCluster == MyClusterNode.LocalCluster {
-		MyLocalCluster.Nodes = append(MyLocalCluster.Nodes)
+		MyLocalCluster.Nodes[name] = newNode
 	}
 	return nil
 }
@@ -106,6 +113,7 @@ func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
 		if !ok {
 			panic("Could not get TCPAddr!")
 		}
+		log.Println(gospMsgData)
 		err = addNodeToCluster(gospMsgData.LocalCluster, gospMsgData.Port, gospMsgData.Name, clientIP)
 		if err != nil {
 			panic(err)
@@ -114,9 +122,9 @@ func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
 	default:
 		log.Println("Unrecognized message")
 		c.Write([]byte("Unrecognized message\n"))
-		// c.Close()
-		// return
 	}
+	c.Close()
+	return
 }
 
 func handleConnection(c net.Conn) {
@@ -171,8 +179,10 @@ func StartGossipServer() {
 		for {
 			c, err := GossipServer.Accept()
 			if err != nil {
-				fmt.Println("server err:")
-				fmt.Println(err)
+				if !strings.Contains(err.Error(), "use of closed network connection") { // Benign error
+					fmt.Println("server err:")
+					fmt.Println(err)
+				}
 				return
 			}
 			go handleConnection(c)
@@ -186,7 +196,6 @@ func SendGossipMessage(nodeAddr string) {
 		log.Println("Could not connect to fellow node!")
 		log.Fatalln(err)
 	}
-	defer con.Close()
 
 	serverReader := bufio.NewReader(con)
 
@@ -238,7 +247,8 @@ func SendGossipMessage(nodeAddr string) {
 		log.Printf("server error: %v\n", err)
 		return
 	}
-	con.Close()
+	fmt.Println("closing client connection")
+	con.Close() // Close connection
 }
 
 func BeginClustering() {

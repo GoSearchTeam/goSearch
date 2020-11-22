@@ -21,7 +21,7 @@ func HandleClusterRoutes(r *gin.Engine) {
 	clusterGroup := r.Group("/cluster")
 
 	clusterGroup.GET("/nodes", func(c *gin.Context) {
-		nodeList := append(AllNodesButMe, MyClusterNode)
+		nodeList := AllNodes
 		fmt.Println(nodeList)
 		c.JSON(200, nodeList)
 	})
