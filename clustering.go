@@ -16,8 +16,9 @@ var (
 	MyLocalCluster  *LocalClusterGroup
 	MyGlobalCluster *GlobalCluster
 	MyClusterNode   *ClusterNode
-	AllNodes        map[string]*ClusterNode
-	GossipServer    net.Listener
+	// AllNodes Name: Node
+	AllNodes     map[string]*ClusterNode
+	GossipServer net.Listener
 )
 
 // GlobalCluster A total cluster
@@ -65,6 +66,10 @@ type GossipMessageTypeHello struct { // GossipMessage.Type == "hello"
 	Port         int    `json:"port"`
 	Name         string `json:"name"`
 	Interface    string `json:"interface"`
+}
+
+type GossipMessageTypeHelloResponse struct {
+	ClusterNodes []ClusterNode `json:"clusterNodes"`
 }
 
 func InitMyNode() {
@@ -118,7 +123,6 @@ func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
 			c.Close()
 			return
 		}
-		log.Println(gospMsgData)
 		err = addNodeToCluster(gospMsgData.LocalCluster, gospMsgData.Port, gospMsgData.Name, gospMsgData.Interface)
 		if err != nil {
 			logger.Error(err)
@@ -126,7 +130,28 @@ func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
 			c.Close()
 			return
 		}
-		c.Write([]byte("got it\n"))
+		// Respond with all the nodes I have
+		sendAllNodes := GossipMessageTypeHelloResponse{}
+		for k, v := range AllNodes {
+			if k != gospMsgData.Name { // Don't send it itself
+				sendAllNodes.ClusterNodes = append(sendAllNodes.ClusterNodes, *v)
+			}
+		}
+		respData, err := json.Marshal(sendAllNodes)
+		if err != nil {
+			logger.Error(err)
+			return
+		}
+		finalObj := GossipMessage{
+			Data: respData,
+			Type: "helloResponse",
+		}
+		finalData, err := json.Marshal(finalObj)
+		if err != nil {
+			logger.Error(err)
+			return
+		}
+		c.Write([]byte(string(finalData) + "\n"))
 		c.Close()
 		data := GossipMessageTypeHello{
 			LocalCluster: gospMsgData.LocalCluster,
@@ -139,7 +164,7 @@ func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
 			logger.Error(err)
 			return
 		}
-		BroadcastGossipMessage(msgData, []string{MyClusterNode.Name}, "addNode")
+		BroadcastGossipMessage(msgData, []string{gospMsgData.Name}, "addNode")
 
 	case "addNode":
 		log.Println("Gossip about new node!")
@@ -158,8 +183,8 @@ func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
 			c.Close()
 			return
 		}
-		c.Write([]byte("Got it."))
-		c.Close()
+		log.Println("returning got it")
+		c.Write([]byte("Got it.\n"))
 		data := GossipMessageTypeHello{
 			LocalCluster: gospMsgData.LocalCluster,
 			Name:         gospMsgData.Name,
@@ -291,13 +316,33 @@ func AddNodeGossipMessage(nodeAddr string) {
 	}
 
 	// Waiting for the server response
-	serverResponse, err := serverReader.ReadString('\n')
+	serverResponse, err := serverReader.ReadString('\n') // TODO: Read as bytes instead maybe?
 
 	switch err {
 	case nil:
-		log.Println("Got from server:", strings.TrimSpace(serverResponse))
+		// Add all of the existing nodes
+		var helloResp GossipMessage
+		err = json.Unmarshal([]byte(serverResponse), &helloResp)
+		if err != nil {
+			logger.Error("Error unmarshalling hello response:")
+			logger.Error(err)
+			con.Close()
+			return
+		}
+		var helloRespData GossipMessageTypeHelloResponse
+		err = json.Unmarshal(helloResp.Data, &helloRespData)
+		if err != nil {
+			logger.Error("Error unmarshalling hello response data:")
+			logger.Error(err)
+			con.Close()
+			return
+		}
+		for _, node := range helloRespData.ClusterNodes {
+			log.Println("adding hello response node", node)
+			addNodeToCluster(node.LocalCluster, node.Port, node.Name, node.IP)
+		}
 	case io.EOF:
-		log.Println("server closed the connection")
+		log.Println("server closed the connectionn")
 		return
 	default:
 		log.Printf("server error: %v\n", err)
@@ -312,7 +357,6 @@ func BeginClustering() {
 	log.Println("Beginning cluster discovery...")
 	if *FellowNodes != "" {
 		nodeList := strings.Split(*FellowNodes, ",")
-		log.Println("Nodelist:", nodeList)
 		for _, node := range nodeList {
 			AddNodeGossipMessage(node)
 		}
@@ -327,7 +371,6 @@ func LeaveGossipCluster() {
 }
 
 func SendGossipMessage(msg []byte, addr string) {
-	log.Println("sending to node", addr)
 	con, err := net.Dial("tcp4", addr)
 	if err != nil {
 		log.Println("Could not connect to fellow node!")
@@ -379,22 +422,21 @@ type void struct{}
 func BroadcastGossipMessage(data []byte, sourceNames []string, msgType string) {
 	// Pick random nodes on in visited list
 	// Make names list of nodes I have
-	myNamesList := make(map[string]void, 0)
-	for _, name := range AllNodes {
-		myNamesList[name.Name] = void{}
+	sourceMap := make(map[string]void, 0)
+	sourceMap[MyClusterNode.Name] = void{}
+	for _, node := range sourceNames {
+		sourceMap[node] = void{}
 	}
-	log.Println("my names list", myNamesList)
 	// Get difference of name lists
 	diffs := []string{}
-	for _, source := range sourceNames {
-		if _, exists := myNamesList[source]; !exists { // Not in the list
-			diffs = append(diffs, source)
+	for _, node := range AllNodes {
+		if _, exists := sourceMap[node.Name]; !exists { // Not in the list
+			diffs = append(diffs, node.Name)
 		}
 	}
 	if len(diffs) == 0 {
 		return // don't even bother
 	}
-	log.Println("diffs", diffs)
 	// Send to 3 random nodes
 	msg := GossipMessage{
 		Data:    data,
@@ -406,11 +448,17 @@ func BroadcastGossipMessage(data []byte, sourceNames []string, msgType string) {
 		logger.Error(err)
 		return
 	}
-	for i := 0; i < 3; i++ {
-		// Get random index
-		randIndex := rand.Intn(len(diffs))
-		// Send to that node
-		SendGossipMessage(jsonData, AllNodes[diffs[randIndex]].Name)
+	if len(diffs) > 3 {
+		for i := 0; i < 3; i++ {
+			// Get random index
+			randIndex := rand.Intn(len(diffs))
+			// Send to that node
+			SendGossipMessage(jsonData, AllNodes[diffs[randIndex]].Name)
+		}
+	} else {
+		for i := 0; i < len(diffs); i++ {
+			SendGossipMessage(jsonData, AllNodes[diffs[i]].Name)
+		}
 	}
 }
 
