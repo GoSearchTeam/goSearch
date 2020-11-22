@@ -64,6 +64,7 @@ type GossipMessageTypeHello struct { // GossipMessage.Type == "hello"
 	LocalCluster string `json:"localCluster"`
 	Port         int    `json:"port"`
 	Name         string `json:"name"`
+	Interface    string `json:"interface"`
 }
 
 func InitMyNode() {
@@ -84,19 +85,15 @@ func InitMyNode() {
 	}
 }
 
-// isRelay is for if this message is being relayed by other nodes
-func addNodeToCluster(localCluster string, port int, name string, tcpAddr *net.TCPAddr, isRelay bool) error {
-	if _, ok := AllNodes[name]; ok && !isRelay { // TODO: Suspect node stuff
-		log.Println("New node pretending to be old node")
-		return nil
-	} else if isRelay {
-		// Drop the message
-		log.Println("I've already seen this node! Not rebroadcasting")
+// isRelay is for if this message is being relayed by other nodes, we don't want to keep relaying it
+func addNodeToCluster(localCluster string, port int, name string, tcpAddr string) error {
+	if _, ok := AllNodes[name]; ok { // TODO: Suspect node stuff
+		log.Println("New node pretending to be old node, or I've seen this already, dropping message...")
 		return nil
 	} else {
 		newNode := &ClusterNode{
 			LocalCluster: localCluster,
-			IP:           tcpAddr.IP.String(),
+			IP:           tcpAddr,
 			Port:         port,
 			Name:         name,
 		}
@@ -116,23 +113,70 @@ func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
 		var gospMsgData GossipMessageTypeHello
 		err := json.Unmarshal(gospMsg.Data, &gospMsgData)
 		if err != nil {
-			panic(err)
-		}
-		clientIP, ok := c.RemoteAddr().(*net.TCPAddr)
-		if !ok {
-			panic("Could not get TCPAddr!")
+			logger.Error(err)
+			c.Write([]byte("JSON decoding error!\n"))
+			c.Close()
+			return
 		}
 		log.Println(gospMsgData)
-		err = addNodeToCluster(gospMsgData.LocalCluster, gospMsgData.Port, gospMsgData.Name, clientIP, false)
+		err = addNodeToCluster(gospMsgData.LocalCluster, gospMsgData.Port, gospMsgData.Name, gospMsgData.Interface)
+		if err != nil {
+			logger.Error(err)
+			c.Write([]byte("JSON decoding error!\n"))
+			c.Close()
+			return
+		}
+		c.Write([]byte("got it\n"))
+		c.Close()
+		data := GossipMessageTypeHello{
+			LocalCluster: gospMsgData.LocalCluster,
+			Name:         gospMsgData.Name,
+			Port:         gospMsgData.Port,
+			Interface:    gospMsgData.Interface,
+		}
+		msgData, err := json.Marshal(data)
+		if err != nil {
+			logger.Error(err)
+			return
+		}
+		BroadcastGossipMessage(msgData, []string{MyClusterNode.Name}, "addNode")
+
+	case "addNode":
+		log.Println("Gossip about new node!")
+		var gospMsgData GossipMessageTypeHello
+		err := json.Unmarshal(gospMsg.Data, &gospMsgData)
+		if err != nil {
+			logger.Error(err)
+			c.Write([]byte("JSON decoding error!\n"))
+			c.Close()
+			return
+		}
+		err = addNodeToCluster(gospMsgData.LocalCluster, gospMsgData.Port, gospMsgData.Name, gospMsgData.Interface)
+		if err != nil {
+			logger.Error(err)
+			c.Write([]byte("error adding new node!\n"))
+			c.Close()
+			return
+		}
+		c.Write([]byte("Got it."))
+		c.Close()
+		data := GossipMessageTypeHello{
+			LocalCluster: gospMsgData.LocalCluster,
+			Name:         gospMsgData.Name,
+			Port:         gospMsgData.Port,
+			Interface:    gospMsgData.Interface,
+		}
+		msgData, err := json.Marshal(data)
 		if err != nil {
 			panic(err)
 		}
-		c.Write([]byte("got it\n"))
+		BroadcastGossipMessage(msgData, append(gospMsg.Visited, MyClusterNode.Name), "addNode")
+
 	default:
 		log.Println("Unrecognized message")
 		c.Write([]byte("Unrecognized message\n"))
+		c.Close()
 	}
-	c.Close()
 	return
 }
 
@@ -214,6 +258,7 @@ func AddNodeGossipMessage(nodeAddr string) {
 			LocalCluster: MyClusterNode.LocalCluster,
 			Name:         MyClusterNode.Name,
 			Port:         MyClusterNode.Port,
+			Interface:    MyClusterNode.IP,
 		}
 		msgData, err := json.Marshal(data)
 		if err != nil {
@@ -330,7 +375,8 @@ type void struct{}
 // BroadcastGossipMessage picks 3 random nodes in the cluster
 // msg is the struct of a JSON encoded message to send
 // sourceName is the source of the message, which will be used to avoid sending a duplicate message to itself
-func BroadcastGossipMessage(data []byte, sourceNames []string) {
+// msgType is the type of the message e.g. "addNode"
+func BroadcastGossipMessage(data []byte, sourceNames []string, msgType string) {
 	// Pick random nodes on in visited list
 	// Make names list of nodes I have
 	myNamesList := make(map[string]void, 0)
@@ -352,7 +398,7 @@ func BroadcastGossipMessage(data []byte, sourceNames []string) {
 	// Send to 3 random nodes
 	msg := GossipMessage{
 		Data:    data,
-		Type:    "addNode",
+		Type:    msgType,
 		Visited: append(sourceNames, MyClusterNode.Name), // append self
 	}
 	jsonData, err := json.Marshal(msg)
