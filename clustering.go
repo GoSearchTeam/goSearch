@@ -38,11 +38,11 @@ type LocalClusterGroup struct {
 
 // ClusterNode A single node within a Cluster
 type ClusterNode struct {
-	LocalCluster  string         // Parent local cluster
-	GlobalCluster *GlobalCluster // Parent global cluster
-	IP            string         // IP Address of the node
-	Port          int            // Port of the node
-	Name          string         // Name of the node
+	LocalCluster  string // Parent local cluster
+	GlobalCluster string // Parent global cluster
+	IP            string // IP Address of the node
+	Port          int    // Port of the node
+	Name          string // Name of the node
 }
 
 // ClusterDiscoverResponse The response struct from discovering nodes
@@ -62,10 +62,11 @@ type GossipMessage struct {
 }
 
 type GossipMessageTypeHello struct { // GossipMessage.Type == "hello"
-	LocalCluster string `json:"localCluster"`
-	Port         int    `json:"port"`
-	Name         string `json:"name"`
-	Interface    string `json:"interface"`
+	LocalCluster  string `json:"localCluster"`
+	Port          int    `json:"port"`
+	Name          string `json:"name"`
+	Interface     string `json:"interface"`
+	GlobalCluster string `json:"globalCluster"`
 }
 
 type GossipMessageTypeHelloResponse struct {
@@ -75,10 +76,11 @@ type GossipMessageTypeHelloResponse struct {
 func InitMyNode() {
 	AllNodes = make(map[string]*ClusterNode)
 	MyClusterNode = &ClusterNode{
-		LocalCluster: *LocalClusterName,
-		IP:           *NodeInterface,
-		Port:         *NodePort,
-		Name:         fmt.Sprintf("%s:%v", *NodeInterface, *NodePort),
+		LocalCluster:  *LocalClusterName,
+		GlobalCluster: *GlobalClusterName,
+		IP:            *NodeInterface,
+		Port:          *NodePort,
+		Name:          fmt.Sprintf("%s:%v", *NodeInterface, *NodePort),
 	}
 	AllNodes[MyClusterNode.Name] = MyClusterNode
 	initMap := make(map[string]*ClusterNode)
@@ -93,14 +95,15 @@ func InitMyNode() {
 // isRelay is for if this message is being relayed by other nodes, we don't want to keep relaying it
 func addNodeToCluster(localCluster string, port int, name string, tcpAddr string) error {
 	if _, ok := AllNodes[name]; ok { // TODO: Suspect node stuff
-		log.Println("New node pretending to be old node, or I've seen this already, dropping message...")
+		log.Println("New node pretending to be old node, or I've seen this already, dropping add...")
 		return nil
 	} else {
 		newNode := &ClusterNode{
-			LocalCluster: localCluster,
-			IP:           tcpAddr,
-			Port:         port,
-			Name:         name,
+			LocalCluster:  localCluster,
+			IP:            tcpAddr,
+			Port:          port,
+			Name:          name,
+			GlobalCluster: *GlobalClusterName,
 		}
 		AllNodes[name] = newNode
 		if localCluster == MyClusterNode.LocalCluster {
@@ -120,6 +123,12 @@ func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
 		if err != nil {
 			logger.Error(err)
 			c.Write([]byte("JSON decoding error!\n"))
+			c.Close()
+			return
+		}
+		if gospMsgData.GlobalCluster != *GlobalClusterName {
+			logger.Error("Node tried to join with another global cluster name!")
+			c.Write([]byte("Different Global Cluster Name, Rejecting!\n"))
 			c.Close()
 			return
 		}
@@ -183,7 +192,6 @@ func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
 			c.Close()
 			return
 		}
-		log.Println("returning got it")
 		c.Write([]byte("Got it.\n"))
 		data := GossipMessageTypeHello{
 			LocalCluster: gospMsgData.LocalCluster,
@@ -280,10 +288,11 @@ func AddNodeGossipMessage(nodeAddr string) {
 	switch err {
 	case nil:
 		data := GossipMessageTypeHello{
-			LocalCluster: MyClusterNode.LocalCluster,
-			Name:         MyClusterNode.Name,
-			Port:         MyClusterNode.Port,
-			Interface:    MyClusterNode.IP,
+			LocalCluster:  MyClusterNode.LocalCluster,
+			Name:          MyClusterNode.Name,
+			Port:          MyClusterNode.Port,
+			Interface:     MyClusterNode.IP,
+			GlobalCluster: *GlobalClusterName,
 		}
 		msgData, err := json.Marshal(data)
 		if err != nil {
@@ -297,7 +306,6 @@ func AddNodeGossipMessage(nodeAddr string) {
 		if err != nil {
 			panic(err)
 		}
-		log.Println("sending", string(jsonData))
 		if _, err = con.Write([]byte(string(jsonData) + "\n")); err != nil {
 			log.Printf("failed to send the client request: %v\n", err)
 		}
@@ -321,6 +329,11 @@ func AddNodeGossipMessage(nodeAddr string) {
 	switch err {
 	case nil:
 		// Add all of the existing nodes
+		if strings.Contains(serverResponse, "Different Global Cluster Name, Rejecting!") {
+			log.Println("Got rejected! Tried to join a different global cluster!")
+			con.Close()
+			return
+		}
 		var helloResp GossipMessage
 		err = json.Unmarshal([]byte(serverResponse), &helloResp)
 		if err != nil {
@@ -338,7 +351,6 @@ func AddNodeGossipMessage(nodeAddr string) {
 			return
 		}
 		for _, node := range helloRespData.ClusterNodes {
-			log.Println("adding hello response node", node)
 			addNodeToCluster(node.LocalCluster, node.Port, node.Name, node.IP)
 		}
 	case io.EOF:
