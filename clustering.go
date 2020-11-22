@@ -215,12 +215,11 @@ func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
 
 func handleConnection(c net.Conn) {
 	fmt.Printf("Serving %s\n", c.RemoteAddr().String())
-	c.SetReadDeadline(time.Now().Add(time.Second * 3))
-	// defer func() {
-	// 	c.Write([]byte("Read Timeout!\n"))
-	// 	fmt.Printf("Closing connection to %s\n", c.RemoteAddr().String())
-	// 	c.Close()
-	// }()
+	c.SetDeadline(time.Now().Add(time.Second * 5))
+	defer func() {
+		fmt.Printf("Closing connection to %s\n", c.RemoteAddr().String())
+		c.Close()
+	}()
 
 	// request, err := bufio.NewReader(c).ReadString('\n')
 	// result := "heyyy\n"
@@ -231,8 +230,12 @@ func handleConnection(c net.Conn) {
 	decoder := json.NewDecoder(c)
 	err := decoder.Decode(&gospMsg)
 	if err != nil {
-		log.Println("Uh oh!")
-		panic(err)
+		if strings.Contains(err.Error(), "i/o timeout") {
+			logger.Warn("Timeout for connection", c.RemoteAddr().String())
+		} else {
+			logger.Error("Error handling tcp connection:")
+			logger.Error(err)
+		}
 	}
 	// for {
 	switch err {
@@ -250,7 +253,11 @@ func handleConnection(c net.Conn) {
 		log.Println("client closed the connection by terminating the process")
 		return
 	default:
-		log.Printf("error: %v\n", err)
+		if strings.Contains(err.Error(), "i/o timeout") {
+			// Already logged somewhere else
+		} else {
+			log.Printf("error: %v\n", err)
+		}
 		return
 	}
 }
@@ -283,6 +290,8 @@ func AddNodeGossipMessage(nodeAddr string) {
 		log.Fatalln(err)
 	}
 
+	con.SetDeadline(time.Now().Add(time.Second * 5))
+
 	serverReader := bufio.NewReader(con)
 
 	switch err {
@@ -310,6 +319,7 @@ func AddNodeGossipMessage(nodeAddr string) {
 			log.Printf("failed to send the client request: %v\n", err)
 		}
 		if err != nil {
+			log.Println("erro:", err)
 			logger.Error(err)
 		}
 		// if _, err = con.Write([]byte("\n")); err != nil {
@@ -357,7 +367,11 @@ func AddNodeGossipMessage(nodeAddr string) {
 		log.Println("server closed the connectionn")
 		return
 	default:
-		log.Printf("server error: %v\n", err)
+		if strings.Contains(err.Error(), "i/o timeout") {
+			log.Println("IO Timeout...")
+		} else {
+			log.Printf("server error: %v\n", err)
+		}
 		return
 	}
 	fmt.Println("closing client connection")
