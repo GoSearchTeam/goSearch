@@ -70,7 +70,7 @@ func InitMyNode() {
 		LocalCluster: *LocalClusterName,
 		IP:           *NodeInterface,
 		Port:         *NodePort,
-		Name:         fmt.Sprintf("%s-%v", *NodeInterface, *NodePort),
+		Name:         fmt.Sprintf("%s:%v", *NodeInterface, *NodePort),
 	}
 	AllNodes[MyClusterNode.Name] = MyClusterNode
 	initMap := make(map[string]*ClusterNode)
@@ -83,7 +83,7 @@ func InitMyNode() {
 }
 
 func addNodeToCluster(localCluster string, port int, name string, tcpAddr *net.TCPAddr) error {
-	if _, ok := AllNodes[name]; ok {
+	if _, ok := AllNodes[name]; ok { // TODO: Suspect node stuff
 		log.Println("New node pretending to be old node")
 	}
 	newNode := &ClusterNode{

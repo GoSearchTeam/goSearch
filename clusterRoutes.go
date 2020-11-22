@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
 )
 
@@ -21,8 +20,10 @@ func HandleClusterRoutes(r *gin.Engine) {
 	clusterGroup := r.Group("/cluster")
 
 	clusterGroup.GET("/nodes", func(c *gin.Context) {
-		nodeList := AllNodes
-		fmt.Println(nodeList)
+		nodeList := make([]*ClusterNode, 0)
+		for _, v := range AllNodes {
+			nodeList = append(nodeList, v)
+		}
 		c.JSON(200, nodeList)
 	})
 }
