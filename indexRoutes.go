@@ -58,7 +58,7 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 	r.POST("/index/add", func(c *gin.Context) {
 		data, _ := ioutil.ReadAll(c.Request.Body)
 		jDat, _ := parseArbJSON(string(data))
-		docID := app.addIndex(jDat)
+		docID := app.addIndex(jDat, false)
 		c.JSON(200, gin.H{
 			"msg":   "Added Index",
 			"docID": docID,
@@ -71,7 +71,7 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 		json.Unmarshal([]byte(data), &jDat)
 		docIDs := make([]uint64, 0)
 		for _, item := range jDat.Items {
-			docIDs = append(docIDs, app.addIndex(item))
+			docIDs = append(docIDs, app.addIndex(item, false))
 		}
 		c.JSON(200, gin.H{
 			"msg":    "Added Indexes",

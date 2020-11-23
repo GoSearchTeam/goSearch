@@ -19,7 +19,11 @@ var (
 	// AllNodes Name: Node
 	AllNodes     map[string]*ClusterNode
 	GossipServer net.Listener
+	GMCache      *GossipMessageCache
 )
+
+// GossipMessageCache used to prevent duplicate action of gossip message
+type GossipMessageCache map[uint64]void
 
 // GlobalCluster A total cluster
 type GlobalCluster struct {
@@ -59,6 +63,8 @@ type GossipMessage struct {
 	Type    string   `json:"type"`
 	Data    []byte   `json:"data"`    // Data JSON depends on the type
 	Visited []string `json:"visited"` // Which nodes this message has already visited
+	TTL     int      `json:"ttl"`     // TTL for message
+	ID      uint64   `json:"id"`      // De-duplication id
 }
 
 type GossipMessageTypeHello struct { // GossipMessage.Type == "hello"
@@ -71,6 +77,12 @@ type GossipMessageTypeHello struct { // GossipMessage.Type == "hello"
 
 type GossipMessageTypeHelloResponse struct {
 	ClusterNodes []ClusterNode `json:"clusterNodes"`
+}
+
+type GossipMessageTypeAddIndex struct {
+	DocID  uint64                 `json:"docID"`
+	Fields map[string]interface{} `json:"fields"`
+	App    string                 `json:"app"`
 }
 
 func InitMyNode() {
@@ -90,6 +102,7 @@ func InitMyNode() {
 		NodeCount: 1,
 		Nodes:     initMap,
 	}
+	GMCache = &GossipMessageCache{}
 }
 
 // isRelay is for if this message is being relayed by other nodes, we don't want to keep relaying it
@@ -115,6 +128,14 @@ func addNodeToCluster(localCluster string, port int, name string, tcpAddr string
 }
 
 func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
+	isDup := false
+	log.Println("Message id", gospMsg.ID, "ttl", gospMsg.TTL)
+	// Handle duplicate message
+	if _, ok := (*GMCache)[gospMsg.ID]; ok { // Message is duplicate, gets put in cache at Broadcast
+		log.Println("Message is duplicate!")
+		isDup = true
+	}
+	// Handle message
 	switch gospMsg.Type {
 	case "hello":
 		log.Println("New node just waved hello!")
@@ -132,12 +153,14 @@ func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
 			c.Close()
 			return
 		}
-		err = addNodeToCluster(gospMsgData.LocalCluster, gospMsgData.Port, gospMsgData.Name, gospMsgData.Interface)
-		if err != nil {
-			logger.Error(err)
-			c.Write([]byte("JSON decoding error!\n"))
-			c.Close()
-			return
+		if !isDup { // de-duplication
+			err = addNodeToCluster(gospMsgData.LocalCluster, gospMsgData.Port, gospMsgData.Name, gospMsgData.Interface)
+			if err != nil {
+				logger.Error(err)
+				c.Write([]byte("JSON decoding error!\n"))
+				c.Close()
+				return
+			}
 		}
 		// Respond with all the nodes I have
 		sendAllNodes := GossipMessageTypeHelloResponse{}
@@ -173,7 +196,10 @@ func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
 			logger.Error(err)
 			return
 		}
-		BroadcastGossipMessage(msgData, []string{gospMsgData.Name}, "addNode")
+		if gospMsg.TTL-1 > 0 {
+			BroadcastGossipMessage(msgData, []string{gospMsgData.Name}, "addNode", gospMsg.TTL, gospMsg.ID)
+		}
+		// client will close connection
 
 	case "addNode":
 		log.Println("Gossip about new node!")
@@ -185,12 +211,14 @@ func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
 			c.Close()
 			return
 		}
-		err = addNodeToCluster(gospMsgData.LocalCluster, gospMsgData.Port, gospMsgData.Name, gospMsgData.Interface)
-		if err != nil {
-			logger.Error(err)
-			c.Write([]byte("error adding new node!\n"))
-			c.Close()
-			return
+		if !isDup { // de-duplication
+			err = addNodeToCluster(gospMsgData.LocalCluster, gospMsgData.Port, gospMsgData.Name, gospMsgData.Interface)
+			if err != nil {
+				logger.Error(err)
+				c.Write([]byte("error adding new node!\n"))
+				c.Close()
+				return
+			}
 		}
 		c.Write([]byte("Got it.\n"))
 		data := GossipMessageTypeHello{
@@ -203,13 +231,37 @@ func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
 		if err != nil {
 			panic(err)
 		}
-		BroadcastGossipMessage(msgData, append(gospMsg.Visited, MyClusterNode.Name), "addNode")
+		if gospMsg.TTL-1 > 0 {
+			BroadcastGossipMessage(msgData, gospMsg.Visited, "addNode", gospMsg.TTL, gospMsg.ID)
+		}
+		// client will close connection
+
+	case "addIndex":
+		log.Println("\n\nGossip about new document!")
+		var gospMsgData GossipMessageTypeAddIndex
+		err := json.Unmarshal(gospMsg.Data, &gospMsgData)
+		if err != nil {
+			logger.Error(err)
+			c.Write([]byte("JSON decoding addIndex error!\n"))
+			c.Close()
+			return
+		}
+		if !isDup {
+			docID := addIndexFromGossip(gospMsgData.DocID, gospMsgData.App, gospMsgData.Fields) // TODO: Make dynamic
+			log.Println("added doc id", docID, "from gossip!")
+		}
+		c.Write([]byte("Got it.\n"))
+		if gospMsg.TTL-1 > 0 {
+			BroadcastGossipMessage(gospMsg.Data, gospMsg.Visited, "addIndex", gospMsg.TTL, gospMsg.ID)
+		}
+		// client will close connection
 
 	default:
 		log.Println("Unrecognized message")
 		c.Write([]byte("Unrecognized message\n"))
 		c.Close()
 	}
+
 	return
 }
 
@@ -307,9 +359,13 @@ func AddNodeGossipMessage(nodeAddr string) {
 		if err != nil {
 			panic(err)
 		}
+		rand.Seed(time.Now().UnixNano())
+		newID := rand.Uint64()
 		msg := GossipMessage{
 			Data: msgData,
 			Type: "hello",
+			ID:   newID,
+			TTL:  6,
 		}
 		jsonData, err := json.Marshal(msg)
 		if err != nil {
@@ -397,6 +453,7 @@ func LeaveGossipCluster() {
 }
 
 func SendGossipMessage(msg []byte, addr string) {
+	log.Println("Sending to", addr)
 	con, err := net.Dial("tcp4", addr)
 	if err != nil {
 		log.Println("Could not connect to fellow node!")
@@ -443,47 +500,45 @@ type void struct{}
 
 // BroadcastGossipMessage picks 3 random nodes in the cluster
 // msg is the struct of a JSON encoded message to send
-// sourceName is the source of the message, which will be used to avoid sending a duplicate message to itself
+// sourceName is the source of the message, which will be used to avoid sending a duplicate message to itself. Functions adds itself to list
 // msgType is the type of the message e.g. "addNode"
-func BroadcastGossipMessage(data []byte, sourceNames []string, msgType string) {
+// ttl is TTL of message. Function decrements ttl
+// id is de-duplication id of message
+func BroadcastGossipMessage(data []byte, sourceNames []string, msgType string, ttl int, id uint64) {
+	(*GMCache)[id] = void{}
 	// Pick random nodes on in visited list
-	// Make names list of nodes I have
-	sourceMap := make(map[string]void, 0)
-	sourceMap[MyClusterNode.Name] = void{}
-	for _, node := range sourceNames {
-		sourceMap[node] = void{}
-	}
-	// Get difference of name lists
-	diffs := []string{}
-	for _, node := range AllNodes {
-		if _, exists := sourceMap[node.Name]; !exists { // Not in the list
-			diffs = append(diffs, node.Name)
-		}
-	}
-	if len(diffs) == 0 {
-		return // don't even bother
-	}
-	// Send to 3 random nodes
 	msg := GossipMessage{
 		Data:    data,
 		Type:    msgType,
-		Visited: append(sourceNames, MyClusterNode.Name), // append self
+		Visited: append(sourceNames, MyClusterNode.Name),
+		TTL:     ttl - 1,
+		ID:      id,
 	}
 	jsonData, err := json.Marshal(msg)
 	if err != nil {
+		logger.Error("error marshalling json data to broadcast gossip message:")
 		logger.Error(err)
 		return
 	}
-	if len(diffs) > 3 {
+	// Send to up to 3 random nodes
+	if len(AllNodes) > 3 { // TODO: Make a faster way to pick a random node from a map (this is O(3n)), maybe also have a slice?
 		for i := 0; i < 3; i++ {
 			// Get random index
-			randIndex := rand.Intn(len(diffs))
+			randIndex := rand.Intn(len(AllNodes))
 			// Send to that node
-			SendGossipMessage(jsonData, AllNodes[diffs[randIndex]].Name)
+			indx := 0
+			for _, node := range AllNodes {
+				if randIndex == indx {
+					SendGossipMessage(jsonData, node.Name)
+				}
+				indx++
+			}
 		}
 	} else {
-		for i := 0; i < len(diffs); i++ {
-			SendGossipMessage(jsonData, AllNodes[diffs[i]].Name)
+		for _, node := range AllNodes {
+			if node.Name != MyClusterNode.Name {
+				SendGossipMessage(jsonData, node.Name)
+			}
 		}
 	}
 }

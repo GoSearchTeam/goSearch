@@ -286,14 +286,18 @@ func (appindex *appIndexes) addIndexFromDisk(parsed map[string]interface{}, file
 	return id
 }
 
-func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID uint64) {
-	// log.Println("### Adding index...")
+func (appindex *appIndexes) addIndex(parsed map[string]interface{}, fromGossip bool) (documentID uint64) {
+	// log.Println("### Adding index...", fromGossip)
 	// Format the input
 	rand.Seed(time.Now().UnixNano())
 	var id uint64
 	if parsed["docID"] != nil {
-		pre, _ := parsed["docID"].(json.Number).Int64()
-		id = uint64(pre)
+		if fromGossip { // docID is uint64 already
+			id = parsed["docID"].(uint64)
+		} else { // docID is json.Number
+			pre, _ := parsed["docID"].(json.Number).Int64()
+			id = uint64(pre)
+		}
 	} else {
 		id = rand.Uint64()
 	}
@@ -330,11 +334,35 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}) (documentID 
 	}
 	// Remove docID field
 	delete(parsed, "docID")
+	// Gossip addIndex
 	appindex.TotalDocuments++ // Increase document count
 	// Write indexes document to disk
 	sendback, _ := stringIndex(parsed)
 	ioutil.WriteFile(fmt.Sprintf("./documents/%v", id), []byte(sendback), os.FileMode(0660))
+	gossipStruct := GossipMessageTypeAddIndex{
+		DocID:  id,
+		Fields: parsed,
+		App:    appindex.Name,
+	}
+	gossipData, err := json.Marshal(gossipStruct)
+	if err != nil {
+		logger.Error("Error marshalling json data for adding index gossip")
+		logger.Error(err)
+		return
+	}
+	if !fromGossip {
+		newID := rand.Uint64()
+		BroadcastGossipMessage(gossipData, []string{}, "addIndex", 6, newID)
+	}
 	return id
+}
+
+func addIndexFromGossip(docID uint64, appName string, fields map[string]interface{}) (documentID uint64) {
+	// TODO: check if app exists
+	// TODO: create app if not exists
+	fields["docID"] = docID
+	realID := Apps[appName].addIndex(fields, true)
+	return realID
 }
 
 func (appindex *appIndexes) search(input string, fields []string, bw bool) (documentIDs []uint64, response SearchResponse) {
@@ -638,11 +666,11 @@ func (appindex *appIndexes) updateIndex(parsed map[string]interface{}) (errrr er
 	}
 	err = appindex.deleteIndex(docID)
 	if os.IsNotExist(err) {
-		appindex.addIndex(parsed)
+		appindex.addIndex(parsed, false)
 		err = nil
 		return err, true
 	} else if err == nil {
-		appindex.addIndex(parsed)
+		appindex.addIndex(parsed, false)
 	}
 	return err, false
 }
