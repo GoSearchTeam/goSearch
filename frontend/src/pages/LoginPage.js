@@ -22,7 +22,7 @@ export default function LoginPage (props) {
             type='submit'
             variant='primary'
             className='btn btn-dark btn-lg btn-block'
-            onClick={() => history.push('/admin/managment')}
+            onClick={() => history.push('/admin/stats')}
           >
             Sign in
           </button>
