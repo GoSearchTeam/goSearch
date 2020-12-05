@@ -85,9 +85,11 @@ During this process we handle [Ranking and Sorting](#ranking-and-sorting).
 
 Opening up a document to rank and sort is very expensive. In order to handle the ranking and sorting, we look at the frequency of a document as it appears in a search. The more times a document appears from the search of the `AppIndex`, the higher rank it obtains. We then take this stage 1 rank, and begin to open documents. Once the documents are open, we then take into account what information needs to be served back. If only certain fields of a document are requested, we filter out the rest of the fields before sending the data back.
 
+The way in which the data is stored and sorted is a proprietary modification of the `Pivoted Normalization Formula`. What gives GoSearch such speed and consistency is that **part of the algorithm for scoring and sorting a search result is done at index time**, meaning we have around half of the formula and sorting completed before a search result even comes in. **At search time we only have to perform a subset of the typical operations on a much smaller dataset as the documents are pre-sorted and partially pre-scored.**
+
 #### Why NoSQL Search?
 
-GoSearch tackles the same problems for search that DBs like Cassandra and DyanmoDB tackle for databases. Low latency, eventually consistent, linearly scalable, and global distribution. GoSearch also adds additional features such as direct user connection through web sockets for extremely low latency search.
+GoSearch tackles the same problems for search that DBs like Cassandra and DynamoDB tackle for databases. Low latency, eventually consistent, linearly scalable, and global distribution. GoSearch also adds additional features such as direct user connection through web sockets for extremely low latency search.
 
 #### Clustering
 
