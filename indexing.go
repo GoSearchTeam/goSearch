@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/armon/go-radix"
-	"github.com/elliotchance/orderedmap"
 	"io/ioutil"
 	"log"
 	"math"
@@ -17,6 +15,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/armon/go-radix"
+	"github.com/elliotchance/orderedmap"
 )
 
 // =============================================================================
@@ -351,8 +352,9 @@ func (appindex *appIndexes) addIndex(parsed map[string]interface{}, fromGossip b
 		return
 	}
 	if !fromGossip {
-		newID := rand.Uint64()
-		BroadcastGossipMessage(gossipData, []string{}, "addIndex", 6, newID)
+		// newID := rand.Uint64()
+		// BroadcastGossipMessage(gossipData, []string{}, "addIndex", 6, newID)
+		TellClusterAddIndex(gossipData)
 	}
 	return id
 }

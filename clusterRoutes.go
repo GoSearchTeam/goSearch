@@ -1,6 +1,10 @@
 package main
 
 import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -25,5 +29,14 @@ func HandleClusterRoutes(r *gin.Engine) {
 			nodeList = append(nodeList, v)
 		}
 		c.JSON(200, nodeList)
+	})
+
+	clusterGroup.POST("/addIndex", func(c *gin.Context) {
+		fmt.Println("Being told to add index")
+		data, _ := ioutil.ReadAll(c.Request.Body)
+		jDat := GossipMessageTypeAddIndex{}
+		json.Unmarshal([]byte(data), &jDat)
+		ClusterAddIndex(&jDat)
+		c.String(200, "Done")
 	})
 }

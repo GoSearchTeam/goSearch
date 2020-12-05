@@ -2,12 +2,15 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"math/rand"
 	"net"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -47,6 +50,7 @@ type ClusterNode struct {
 	IP            string // IP Address of the node
 	Port          int    // Port of the node
 	Name          string // Name of the node
+	APIPort       int    // Port for the API of the node
 }
 
 // ClusterDiscoverResponse The response struct from discovering nodes
@@ -73,6 +77,7 @@ type GossipMessageTypeHello struct { // GossipMessage.Type == "hello"
 	Name          string `json:"name"`
 	Interface     string `json:"interface"`
 	GlobalCluster string `json:"globalCluster"`
+	APIPort       int    `json:"apiPort"`
 }
 
 type GossipMessageTypeHelloResponse struct {
@@ -93,6 +98,7 @@ func InitMyNode() {
 		IP:            *NodeInterface,
 		Port:          *NodePort,
 		Name:          fmt.Sprintf("%s:%v", *NodeInterface, *NodePort),
+		APIPort:       *APIPort,
 	}
 	AllNodes[MyClusterNode.Name] = MyClusterNode
 	initMap := make(map[string]*ClusterNode)
@@ -106,7 +112,7 @@ func InitMyNode() {
 }
 
 // isRelay is for if this message is being relayed by other nodes, we don't want to keep relaying it
-func addNodeToCluster(localCluster string, port int, name string, tcpAddr string) error {
+func addNodeToCluster(localCluster string, port int, name string, tcpAddr string, apiPort int) error {
 	if _, ok := AllNodes[name]; ok { // TODO: Suspect node stuff
 		log.Println("New node pretending to be old node, or I've seen this already, dropping add...")
 		return nil
@@ -117,6 +123,7 @@ func addNodeToCluster(localCluster string, port int, name string, tcpAddr string
 			Port:          port,
 			Name:          name,
 			GlobalCluster: *GlobalClusterName,
+			APIPort:       apiPort,
 		}
 		AllNodes[name] = newNode
 		if localCluster == MyClusterNode.LocalCluster {
@@ -154,7 +161,7 @@ func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
 			return
 		}
 		if !isDup { // de-duplication
-			err = addNodeToCluster(gospMsgData.LocalCluster, gospMsgData.Port, gospMsgData.Name, gospMsgData.Interface)
+			err = addNodeToCluster(gospMsgData.LocalCluster, gospMsgData.Port, gospMsgData.Name, gospMsgData.Interface, gospMsgData.APIPort)
 			if err != nil {
 				logger.Error(err)
 				c.Write([]byte("JSON decoding error!\n"))
@@ -212,7 +219,7 @@ func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
 			return
 		}
 		if !isDup { // de-duplication
-			err = addNodeToCluster(gospMsgData.LocalCluster, gospMsgData.Port, gospMsgData.Name, gospMsgData.Interface)
+			err = addNodeToCluster(gospMsgData.LocalCluster, gospMsgData.Port, gospMsgData.Name, gospMsgData.Interface, gospMsgData.APIPort)
 			if err != nil {
 				logger.Error(err)
 				c.Write([]byte("error adding new node!\n"))
@@ -353,6 +360,7 @@ func AddNodeGossipMessage(nodeAddr string) {
 			Name:          MyClusterNode.Name,
 			Port:          MyClusterNode.Port,
 			Interface:     MyClusterNode.IP,
+			APIPort:       MyClusterNode.APIPort,
 			GlobalCluster: *GlobalClusterName,
 		}
 		msgData, err := json.Marshal(data)
@@ -417,7 +425,7 @@ func AddNodeGossipMessage(nodeAddr string) {
 			return
 		}
 		for _, node := range helloRespData.ClusterNodes {
-			addNodeToCluster(node.LocalCluster, node.Port, node.Name, node.IP)
+			addNodeToCluster(node.LocalCluster, node.Port, node.Name, node.IP, node.APIPort)
 		}
 	case io.EOF:
 		log.Println("server closed the connectionn")
@@ -493,6 +501,34 @@ func SendGossipMessage(msg []byte, addr string) {
 	}
 	fmt.Println("closing client connection")
 	con.Close() // Close connection
+}
+
+func ClusterAddIndex(newDocStruct *GossipMessageTypeAddIndex) error {
+	addIndexFromGossip(newDocStruct.DocID, newDocStruct.App, newDocStruct.Fields)
+	return nil
+}
+
+func TellClusterAddIndex(newDocStructData []byte) {
+	fmt.Println("Telling cluster to add index")
+	for _, node := range AllNodes {
+		if node.Name == MyClusterNode.Name { // Don't do me
+			continue
+		}
+		resp, err := http.Post(fmt.Sprintf("http://%s:%d/cluster/addIndex", node.IP, node.APIPort), "application/json", bytes.NewBuffer(newDocStructData))
+		if err != nil {
+			log.Println("Error making request to another node:")
+			log.Println(err)
+			logger.Error(err)
+			continue
+		}
+		if resp.StatusCode > 299 {
+			log.Println(">300 status code:")
+			log.Println(resp.StatusCode)
+			body, _ := ioutil.ReadAll(resp.Body)
+			log.Println(string(body))
+		}
+		resp.Body.Close()
+	}
 }
 
 // void is just an empty struct
