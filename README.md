@@ -5,6 +5,8 @@ Full-Text Search Engine Written in Go
 
 - [Features](#features)
 - [Usage](#usage)
+  - [Node Configuration](#node-configuration)
+  - [Web interface](#web-interface)
     - [CLI Arguments](#cli-arguments)
     - [To-Do:](#to-do)
 - [Performance](#performance)
@@ -30,9 +32,15 @@ Full-Text Search Engine Written in Go
 
 ## Usage
 
+### Node Configuration
+
 In its current form, all configuration is done through the cli.
 
 **Example usage** (node joining cluster): ``./goSearch --cluster-mode --iface="192.168.86.237" --gossip-port=7777 --port=8182 --fellow-nodes="192.168.86.237:4444" --local-cluster="lc1" --global-cluster="glob1"``
+
+### Web interface
+
+Nodes will also each present a web ui from the `/admin` url. In this interface, you can do basic document operations, monitor the performance of the node, and see its logs.
 
 #### CLI Arguments
 
@@ -88,7 +96,7 @@ OrderedMaps are sorted by their key, and as a result we could run into conflicts
 
 To get the read performance we want (O(n) time for iterating over highest scored n items), we needed the `score` to be in the key. But in order to prevent collisions from overwriting, we also needed the `docID` to be in the key. _Enter compound keys._ By leveraging the format of `(score#docID, len(field))`, we get the best of both worlds. We can sort by `score`, then by `docID`.
 
-We still maintain very high speeds for insert (O(1) time), as well as update/delete (i + O(1), where i is the time it takes to re-score a document). For delete, since we are given the `docID`, what we can do is fetch the document from disk, re-calculate the score of each field, then use those scores to make O(1) delete operations on the OrderedMap by using the `score#docID` key. For updates, we are also given the `docID`, and perform a delete than insert (i + 2(O(1)) time). This keeps all operations very fast, and by using a `len(field)` value we save some memory since we can pull both the `score` and `docID` by splitting the key at the `#`, and keep the length of that JSON field (key) stored in memory to do all scoring without loading the document object. At the end, we just sum the term scores of the same document (among other things) to get the final document score, and sort based on that score.
+We still maintain very high speeds for insert (O(1) time), as well as update/delete (i + O(1), where `i` is the time it takes to re-score a document). For delete, since we are given the `docID`, what we can do is fetch the document from disk, re-calculate the score of each field, then use those scores to make O(1) delete operations on the OrderedMap by using the `score#docID` key. For updates, we are also given the `docID`, and perform a delete than insert (i + 2(O(1)) time). This keeps all operations very fast, and by using a `len(field)` value we save some memory since we can pull both the `score` and `docID` by splitting the key at the `#`, and keep the length of that JSON field (key) stored in memory to do all scoring without loading the document object. At the end, we just sum the term scores of the same document (among other things) to get the final document score, and sort based on that score.
 
 ## How it Works
 
@@ -112,11 +120,15 @@ During this process we handle [Ranking and Sorting](#ranking-and-sorting).
 
 The way in which the data is stored and sorted is a proprietary modification of the `Pivoted Normalization Formula`. What gives GoSearch such speed and consistency is that **part of the algorithm for scoring and sorting a search result is done at index time**, meaning we have around half of the formula and sorting completed before a search result even comes in. **At search time we only have to perform a subset of the typical operations on a much smaller dataset as the documents are pre-sorted and partially pre-scored.**
 
-_The above section is intentionally kept simple._
+_The above section is intentionally kept simple. See more detail in [Advanced NoSQL Data Patterns for Search](#advanced-nosql-data-patterns-for-search)._
 
 #### Why NoSQL Search?
 
 GoSearch tackles the same problems for search that DBs like Cassandra and DynamoDB tackle for databases. Low latency, eventually consistent, linearly scalable, and global distribution. GoSearch also adds additional features such as direct user connection through web sockets for extremely low latency search.
+
+NoSQL is a double edged sword. One one hand, you have extremely low level access to how the data is handled, meaning you can manipulate it more flexibly and store is less structured. On the other hand, you need to put in the work up front for designing these data models and access patterns in such a way that you can still do direct lookups instead of performing scans over the data.
+
+This low level access to the data (vs. something like SQL) allows us to preemptively sort and score documents before a search occurs, as explained above.
 
 #### Clustering
 
