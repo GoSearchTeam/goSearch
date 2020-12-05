@@ -4,6 +4,8 @@ Full-Text Search Engine Written in Go
 ## Table of Contents <!-- omit in toc -->
 
 - [Features](#features)
+- [Usage](#usage)
+    - [To-Do:](#to-do)
 - [Performance](#performance)
   - [Data Structures](#data-structures)
     - [Why OrderedMaps?](#why-orderedmaps)
@@ -12,6 +14,7 @@ Full-Text Search Engine Written in Go
     - [Basic Architecture](#basic-architecture)
     - [Ranking and Sorting](#ranking-and-sorting)
     - [Why NoSQL Search?](#why-nosql-search)
+    - [Clustering](#clustering)
     - [Test 1 - A Primitive Test](#test-1---a-primitive-test)
     - [Test 2 - A Single Node Comparative Test](#test-2---a-single-node-comparative-test)
 
@@ -23,6 +26,22 @@ Full-Text Search Engine Written in Go
 - Fault tolerance (replication)
 - Global and local clusters (similar to Cassandra)
 - Linearly scalable (read & write)
+
+## Usage
+
+In its current form, all configuration is done through the cli.
+
+#### To-Do:
+
+- Add pre-shared key for connecting to cluster
+- Add in TLS support for gossip
+- Move cluster sharing `addIndex` off HTTP interface
+- Add concurrency/goroutine to index operation sharing
+- Add other index updates to cluster sharing
+- Add other node events to gossip
+- Add cluster node heartbeat and dead/suspect node detection and logic
+- many more things to make this production ready!
+- Build a custom library with latency detection for each node (like datastax cassandra driver)
 
 ## Performance
 
@@ -69,6 +88,18 @@ Opening up a document to rank and sort is very expensive. In order to handle the
 #### Why NoSQL Search?
 
 GoSearch tackles the same problems for search that DBs like Cassandra and DyanmoDB tackle for databases. Low latency, eventually consistent, linearly scalable, and global distribution. GoSearch also adds additional features such as direct user connection through web sockets for extremely low latency search.
+
+#### Clustering
+
+GoSearch uses clustering to provide linear scalability for throughput. In it's current form, more RAM and disk will need to be added to increase the amount of documents stored on a node.
+
+GoSearch uses a custom Gossip implementation on top of TCP to handle inter-node metadata communication. When a single node joins the cluster using a command like `./goSearch --cluster-mode --iface="192.168.86.237" --gossip-port=7777 --port=8182 --fellow-nodes="192.168.86.237:4444" --local-cluster="test1" --global-cluster="glob"`, it only needs one `fellow-nodes` in the list to find all nodes total in the cluster within microseconds (on the same network, cloud results may take up to a few milliseconds). It uses a default TTL of 6 for gossip messages, which is more than enough for 120+ nodes in a cluster.
+
+When a node receives an index operation (add, update, delete), it first performs it locally. If that is successful, then it tells every other node in the cluster to perform the same operation, reaching consensus in the low single digit milliseconds. This ensures that all nodes are eventually consistent with the dataset. Since writes are very low compared to reads for full-text search, this should not be a concern.
+
+Since all nodes have the same dataset, searches are performed entirely locally, resulting in maximum performance. It also means that any node can be searched from, allowing you to always contact the lowest latency node for the fastest possible search result.
+
+The result of the combination of this clustering and data handling model is extremely low latency and high consistency search results across all nodes.
 
 #### Test 1 - A Primitive Test
 ![unknown-3](/assets/unknown-3.png)
