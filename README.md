@@ -5,6 +5,7 @@ Full-Text Search Engine Written in Go
 
 - [Features](#features)
 - [Usage](#usage)
+    - [CLI Arguments](#cli-arguments)
     - [To-Do:](#to-do)
 - [Performance](#performance)
   - [Data Structures](#data-structures)
@@ -25,11 +26,37 @@ Full-Text Search Engine Written in Go
 - Preemptive scoring, sorting, and filtering
 - Fault tolerance (replication)
 - Global and local clusters (similar to Cassandra)
-- Linearly scalable (read & write)
+- Linearly scalable throughput
 
 ## Usage
 
 In its current form, all configuration is done through the cli.
+
+**Example usage** (node joining cluster): ``./goSearch --cluster-mode --iface="192.168.86.237" --gossip-port=7777 --port=8182 --fellow-nodes="192.168.86.237:4444" --local-cluster="lc1" --global-cluster="glob1"``
+
+#### CLI Arguments
+
+`--cluster-mode`: `boolean`
+If provided, the node knows to either begin a cluster, or join one.
+
+`--iface`: `string`
+The interface on which to provide gossip communication. Should be kept over a private network.
+
+`--gossip-port`: `int`
+The port on which to provide gossip communication.
+
+`--port`: `int`
+The port on which the API will listen to.
+_The API currently listens to all interfaces for development purposes, this will become an independent cli flag_.
+
+`--fellow-nodes`: `[]string`
+A CSV of other nodes in the form of `gossip_ip:gossip_port`. Only one node needs to be provided to join the cluster. This flag is only required when a node is joining an existing cluster.
+
+`--local-cluster`: `string`
+The name of the local cluster that the node is joining (reginal)
+
+`--global-cluster`: `string`
+The name of the global cluster that the node is joining. This must match the other nodes listed in the `fellow-nodes` flag.
 
 #### To-Do:
 
@@ -77,15 +104,15 @@ Multiple Apps can exit within a node/cluster. An `App` is just a logical separat
 
 `AppIndexes` have `Index Trees`, which are `Radix Trees`. [Radix Trees](https://en.wikipedia.org/wiki/Radix_tree) allow for really fast prefix search. It is what enables us to have the `beginsWith()` search method, allowing search on the prefix of word.
 
-Each node in an `Index Tree` is a `List Item`. A `List Item` is a [Roaring Bitmap](https://roaringbitmap.org/) which is a high speed compressed bitmap. These bitmaps are of `uint64` giving us 1.844E19 possible documents to store on disk. It also allows us to efficiently perform array operations with a smaller footprint. These bitmaps represent the names of the documents on disk.
+Each node in an `Index Tree` is a `List Item`. A `List Item` is an `OrderedMap`. `OrderedMaps` are a combination of `Doubly Linked Lists` and `maps`, providing update operations in O(1) time, and iteration in O(n). Combined with the pre-sorting and pre-ranking this allows us to search very quickly.
 
 During this process we handle [Ranking and Sorting](#ranking-and-sorting).
 
 #### Ranking and Sorting
 
-Opening up a document to rank and sort is very expensive. In order to handle the ranking and sorting, we look at the frequency of a document as it appears in a search. The more times a document appears from the search of the `AppIndex`, the higher rank it obtains. We then take this stage 1 rank, and begin to open documents. Once the documents are open, we then take into account what information needs to be served back. If only certain fields of a document are requested, we filter out the rest of the fields before sending the data back.
-
 The way in which the data is stored and sorted is a proprietary modification of the `Pivoted Normalization Formula`. What gives GoSearch such speed and consistency is that **part of the algorithm for scoring and sorting a search result is done at index time**, meaning we have around half of the formula and sorting completed before a search result even comes in. **At search time we only have to perform a subset of the typical operations on a much smaller dataset as the documents are pre-sorted and partially pre-scored.**
+
+_The above section is intentionally kept simple._
 
 #### Why NoSQL Search?
 
@@ -95,7 +122,7 @@ GoSearch tackles the same problems for search that DBs like Cassandra and Dynamo
 
 GoSearch uses clustering to provide linear scalability for throughput. In it's current form, more RAM and disk will need to be added to increase the amount of documents stored on a node.
 
-GoSearch uses a custom Gossip implementation on top of TCP to handle inter-node metadata communication. When a single node joins the cluster using a command like `./goSearch --cluster-mode --iface="192.168.86.237" --gossip-port=7777 --port=8182 --fellow-nodes="192.168.86.237:4444" --local-cluster="test1" --global-cluster="glob"`, it only needs one `fellow-nodes` in the list to find all nodes total in the cluster within microseconds (on the same network, cloud results may take up to a few milliseconds). It uses a default TTL of 6 for gossip messages, which is more than enough for 120+ nodes in a cluster.
+GoSearch uses a custom Gossip implementation on top of TCP to handle inter-node metadata communication. When a single node joins the cluster using a command like `./goSearch --cluster-mode --iface="192.168.86.237" --gossip-port=7777 --port=8182 --fellow-nodes="192.168.86.237:4444" --local-cluster="lc1" --global-cluster="glob1"`, it only needs one `fellow-nodes` in the list to find all nodes total in the cluster within microseconds (on the same network, cloud results may take up to a few milliseconds). It uses a default TTL of 6 for gossip messages, which is more than enough for 120+ nodes in a cluster.
 
 When a node receives an index operation (add, update, delete), it first performs it locally. If that is successful, then it tells every other node in the cluster to perform the same operation, reaching consensus in the low single digit milliseconds. This ensures that all nodes are eventually consistent with the dataset. Since writes are very low compared to reads for full-text search, this should not be a concern.
 
