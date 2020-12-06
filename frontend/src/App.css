@@ -1,6 +1,7 @@
 .App {
   background-color: #282c34;
   padding: 25px;
+  min-height: 1000px;
 }
 .App-header {
   text-align: center;
@@ -41,4 +42,13 @@
   padding: 40px 55px 45px 55px;
   border-radius: 15px;
   transition: all .3s;
+}
+
+.nav-bar-round{
+  border-radius: 50px;
+}
+
+.short-hr{
+  max-width: 15%;
+  margin: 0px;
 }

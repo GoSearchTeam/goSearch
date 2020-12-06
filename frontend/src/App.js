@@ -10,7 +10,7 @@ function App() {
   return (
     <Router>
       <div className='App'>
-        <Navbar bg="dark" variant="dark" expand="lg">
+        <Navbar bg="dark" variant="dark" expand="lg" className="nav-bar-round">
           <Navbar.Brand href="./managment">Go Search</Navbar.Brand>
           <Nav className="mr-auto">
             <Nav.Link href="./managment">Managment</Nav.Link>
