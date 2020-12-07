@@ -48,7 +48,15 @@
   border-radius: 50px;
 }
 
+.grey-hr{
+  background-color: grey;
+}
+
 .short-hr{
   max-width: 15%;
   margin: 0px;
+}
+
+.body {
+  color: white;
 }

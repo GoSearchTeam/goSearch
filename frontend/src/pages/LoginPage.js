@@ -21,7 +21,7 @@ export default function LoginPage (props) {
           <button
             type='submit'
             variant='primary'
-            className='btn btn-dark btn-lg btn-block'
+            className='btn btn-dark btn-lg btn-block Skinny-boi'
             onClick={() => history.push('/admin/stats')}
           >
             Sign in

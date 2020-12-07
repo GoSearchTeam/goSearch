@@ -19,14 +19,16 @@ const nodes = [
 export default function Stats(props) {
     return (
         <>
-            <header className="Section-header">Genaral Status</header>
-            <br></br>
-            Nodes Running <Badge variant="dark">{getNodes()}</Badge><br></br>
-            Documents on Disk <Badge variant="dark">{getDocs()}</Badge><br></br>
-            Indexes Currently Searchable <Badge variant="dark">{getIndexes()}</Badge><br></br>
-            <hr></hr>
-            <header className="Section-header">Node Status</header>
-            {getNodeStats()}
+            <div className="body">
+                <header className="Section-header">Genaral Status</header>
+                <br></br>
+                Nodes Running <Badge variant="dark">{getNodes()}</Badge><br></br>
+                Documents on Disk <Badge variant="dark">{getDocs()}</Badge><br></br>
+                Indexes Currently Searchable <Badge variant="dark">{getIndexes()}</Badge><br></br>
+                <hr className="grey-hr"></hr>
+                <header className="Section-header">Node Status</header>
+                {getNodeStats()}
+            </div>
         </>
     );
 }
@@ -47,8 +49,8 @@ function getNodeStats(){
     let nodeStats = [];
     nodes.forEach(node => {
         nodeStats.push(
-            <div>
-                <hr className="short-hr"></hr>
+            <div className="body">
+                <hr className="short-hr grey-hr"></hr>
                 Name: <Badge variant="dark">{node.Name}</Badge><br></br>
                 Local Cluster: <Badge variant="dark">{node.LocalCluster}</Badge><br></br>
                 Global Cluster: <Badge variant="dark">{node.GlobalCluster}</Badge><br></br>
