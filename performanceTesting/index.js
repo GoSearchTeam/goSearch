@@ -38,7 +38,7 @@ const uploadCluster = async (rounds, hosts) => {
     const host = hosts[Math.floor(Math.random() * hosts.length)] // get random host
     const item = await uploadItem(host)
     // Store every 100 items
-    if (i % 10 === 0) {
+    if (i % 100 === 0) {
       console.log(i)
       fs.appendFile('./randomItems.txt', `${JSON.stringify(item)}\n`, () => {})
     }
@@ -49,7 +49,7 @@ const uploadTest = async (rounds) => {
   for (let i = 0; i < rounds; i++) {
     const item = await uploadItem()
     // Store every 100 items
-    if (i % 10 === 0) {
+    if (i % 100 === 0) {
       console.log(i)
       fs.appendFile('./randomItems.txt', `${JSON.stringify(item)}\n`, () => {})
     }
@@ -87,7 +87,7 @@ const searchTest = async () => {
   while (line = liner.next()) {
     items.push(JSON.parse(line))
   }
-  for (let i = 0; i < 10000; i++) {
+  for (let i = 0; i < 1000; i++) {
     // get random item field
     console.log(items[i])
     const theKey = randomProperty(items[i])
@@ -99,7 +99,7 @@ const main = async () => {
   const start = process.hrtime.bigint()
   // await uploadTest(100000)
   // await searchTest()
-  await uploadCluster(100000, ['10.136.0.2:8080', '10.136.0.3:8080', '10.136.0.4:8080'])
+  await uploadCluster(1000000, ['10.136.0.2:8080', '10.136.0.3:8080', '10.136.0.4:8080'])
   const end = process.hrtime.bigint()
   const diffTime = end - start
   console.log(`Total run time: ${Number(diffTime) / 1000000}ms`)
