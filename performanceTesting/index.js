@@ -102,14 +102,16 @@ const searchCluster = async (hosts) => {
   while (line = liner.next()) {
     items.push(JSON.parse(line))
   }
-  for (let i = 0; i < items.length; i++) {
-    // get random item field
-    console.log(items[i])
-    const theKey = randomProperty(items[i])
-    const host = hosts[Math.floor(Math.random() * hosts.length)] // get random host
-    await searchItem(items[i][theKey], host)
+  for (let k = 0; i < 5; k++) {
+    for (let i = 0; i < items.length; i++) {
+      // get random item field
+      console.log(items[i])
+      const theKey = randomProperty(items[i])
+      const host = hosts[Math.floor(Math.random() * hosts.length)] // get random host
+      await searchItem(items[i][theKey], host)
+    }
   }
-  return items.length
+  return items.length * 5
 }
 
 const main = async () => {
