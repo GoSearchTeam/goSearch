@@ -102,7 +102,7 @@ const searchCluster = async (hosts) => {
   while (line = liner.next()) {
     items.push(JSON.parse(line))
   }
-  for (let i = 0; i < 32; i++) {
+  for (let i = 0; i < items.length; i++) {
     // get random item field
     console.log(items[i])
     const theKey = randomProperty(items[i])
