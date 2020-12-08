@@ -58,7 +58,7 @@ const uploadTest = async (rounds) => {
 
 const searchItem = async (itemField, host) => {
   const start = process.hrtime.bigint()
-  const resp = await fetch(`http://${host}:8080/index/search`, {
+  const resp = await fetch(`http://${host}/index/search`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json'
