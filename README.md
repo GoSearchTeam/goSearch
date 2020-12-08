@@ -36,7 +36,7 @@ Full-Text Search Engine Written in Go
 
 In its current form, all configuration is done through the cli.
 
-**Example usage** (node joining cluster): ``./goSearch --cluster-mode --iface="192.168.86.237" --gossip-port=7777 --port=8182 --fellow-nodes="192.168.86.237:4444" --local-cluster="lc1" --global-cluster="glob1"``
+**Example usage** (node joining cluster): `./goSearch --cluster-mode --iface="192.168.86.237" --gossip-port=7777 --port=8182 --fellow-nodes="192.168.86.237:4444" --local-cluster="lc1" --global-cluster="glob1"`
 
 ### Web interface
 

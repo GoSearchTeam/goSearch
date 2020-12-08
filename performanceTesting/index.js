@@ -4,7 +4,7 @@ const fetch = require('isomorphic-fetch')
 const fs = require('fs')
 const nread = require('n-readlines')
 
-const uploadItem = async () => {
+const uploadItem = async (host) => {
   const userObj = {
     name: faker.name.findName(),
     email: faker.internet.email(),
@@ -17,7 +17,7 @@ const uploadItem = async () => {
     uid: nanoid()
   }
   const start = process.hrtime.bigint()
-  const resp = await fetch(`http://${process.env.HOSTNAME}:8080/index/add`, {
+  const resp = await fetch(`http://${host}/index/add`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json'
@@ -31,6 +31,18 @@ const uploadItem = async () => {
   const diffTime = end - start
   fs.appendFile('./operationTimes.csv', `ADD-SINGLE, ${Number(diffTime) / 1000000}\n`, () => {}) // milliseconds
   return userObj
+}
+
+const uploadCluster = async (rounds, hosts) => {
+  for (let i = 0; i < rounds; i++) {
+    const host = hosts[Math.floor(Math.random() * hosts.length)] // get random host
+    const item = await uploadItem(host)
+    // Store every 100 items
+    if (i % 100 === 0) {
+      console.log(i)
+      fs.appendFile('./randomItems.txt', `${JSON.stringify(item)}\n`, () => {})
+    }
+  }
 }
 
 const uploadTest = async (rounds) => {
@@ -85,7 +97,8 @@ const searchTest = async () => {
 
 const main = async () => {
   // await uploadTest(100000)
-  await searchTest()
+  // await searchTest()
+  await uploadCluster(1000000)
 }
 
 main()
