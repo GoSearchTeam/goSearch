@@ -417,6 +417,7 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 					if searchItems != nil {
 						// FIXME: This is a hacky solution for getting number of docs with the term in it
 						numDocsWithTerm := 0
+						fmt.Println("searchItems:", searchItems)
 						for el := searchItems.Front(); el != nil || numDocsWithTerm >= 100; el = el.Next() {
 							fmt.Println("el:", el)
 							numDocsWithTerm++
