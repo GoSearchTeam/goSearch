@@ -455,7 +455,10 @@ func BeginClustering() {
 	}
 	go func() {
 		for {
-			fmt.Println("Nodes:", AllNodes)
+			fmt.Println("### Nodes:")
+			for _, node := range AllNodes {
+				fmt.Println(node)
+			}
 			time.Sleep(time.Second * 3)
 		}
 	}()
