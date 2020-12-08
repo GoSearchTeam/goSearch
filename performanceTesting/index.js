@@ -109,6 +109,7 @@ const searchCluster = async (hosts) => {
     const host = hosts[Math.floor(Math.random() * hosts.length)] // get random host
     await searchItem(items[i][theKey], host)
   }
+  return items.length
 }
 
 const main = async () => {
@@ -116,12 +117,13 @@ const main = async () => {
   // await uploadTest(100000)
   // await searchTest()
   // await uploadCluster(100, ['10.136.0.2:8080', '10.136.0.3:8080', '10.136.0.4:8080'])
-  await searchCluster(['10.136.0.2:8080', '10.136.0.3:8080', '10.136.0.4:8080'])
+  const y = await searchCluster(['10.136.0.2:8080', '10.136.0.3:8080', '10.136.0.4:8080'])
 
   const end = process.hrtime.bigint()
   const diffTime = end - start
   console.log(`Total run time: ${Number(diffTime) / 1000000}ms`)
-  await fetch('https://maker.ifttt.com/trigger/code_done/with/key/kqsSaqYwkOQTkvFnP6yX11xKzfriGO_OAFG1cp0OlXW')
+  console.log(`Average search time: ${(Number(diffTime) / 1000000) / y}ms`)
+  // await fetch('https://maker.ifttt.com/trigger/code_done/with/key/kqsSaqYwkOQTkvFnP6yX11xKzfriGO_OAFG1cp0OlXW')
 }
 
 main()
