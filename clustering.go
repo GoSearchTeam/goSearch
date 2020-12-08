@@ -453,6 +453,12 @@ func BeginClustering() {
 	} else {
 		log.Println("No other nodes")
 	}
+	go func() {
+		for {
+			fmt.Println("Nodes:", AllNodes)
+			time.Sleep(time.Second * 3)
+		}
+	}()
 }
 
 func LeaveGossipCluster() {
