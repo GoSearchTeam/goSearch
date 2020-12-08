@@ -37,8 +37,8 @@ const uploadCluster = async (rounds, hosts) => {
   for (let i = 0; i < rounds; i++) {
     const host = hosts[Math.floor(Math.random() * hosts.length)] // get random host
     const item = await uploadItem(host)
-    // Store every 100 items
-    if (i % 100 === 0) {
+    // Store every 10 items
+    if (i % 10 === 0) {
       console.log(i)
       fs.appendFile('./randomItems.txt', `${JSON.stringify(item)}\n`, () => {})
     }
@@ -48,8 +48,8 @@ const uploadCluster = async (rounds, hosts) => {
 const uploadTest = async (rounds) => {
   for (let i = 0; i < rounds; i++) {
     const item = await uploadItem()
-    // Store every 100 items
-    if (i % 100 === 0) {
+    // Store every 10 items
+    if (i % 10 === 0) {
       console.log(i)
       fs.appendFile('./randomItems.txt', `${JSON.stringify(item)}\n`, () => {})
     }
