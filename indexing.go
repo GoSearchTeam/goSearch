@@ -418,6 +418,7 @@ func (appindex *appIndexes) search(input string, fields []string, bw bool) (docu
 						// FIXME: This is a hacky solution for getting number of docs with the term in it
 						numDocsWithTerm := 0
 						for el := searchItems.Front(); el != nil || numDocsWithTerm >= 100; el = el.Next() {
+							fmt.Println("el:", el)
 							numDocsWithTerm++
 						}
 						// Only first 100 items in orderedmap
