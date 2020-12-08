@@ -99,7 +99,7 @@ const main = async () => {
   const start = process.hrtime.bigint()
   // await uploadTest(100000)
   // await searchTest()
-  await uploadCluster(1000000)
+  await uploadCluster(1000000, ['10.136.0.2:8080, 10.136.0.3:8080, 10.136.0.4:8080'])
   const end = process.hrtime.bigint()
   const diffTime = end - start
   console.log(`Total run time: ${Number(diffTime) / 1000000}ms`)
