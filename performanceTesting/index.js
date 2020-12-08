@@ -56,9 +56,9 @@ const uploadTest = async (rounds) => {
   }
 }
 
-const searchItem = async (itemField) => {
+const searchItem = async (itemField, host) => {
   const start = process.hrtime.bigint()
-  const resp = await fetch(`http://${process.env.HOSTNAME}:8080/index/search`, {
+  const resp = await fetch(`http://${host}:8080/index/search`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json'
@@ -95,11 +95,29 @@ const searchTest = async () => {
   }
 }
 
+const searchCluster = async (hosts) => {
+  const items = []
+  const liner = new nread('./randomItems.txt')
+  let line
+  while (line = liner.next()) {
+    items.push(JSON.parse(line))
+  }
+  for (let i = 0; i < 1000; i++) {
+    // get random item field
+    console.log(items[i])
+    const theKey = randomProperty(items[i])
+    const host = hosts[Math.floor(Math.random() * hosts.length)] // get random host
+    await searchItem(items[i][theKey], host)
+  }
+}
+
 const main = async () => {
   const start = process.hrtime.bigint()
   // await uploadTest(100000)
   // await searchTest()
-  await uploadCluster(1000000, ['10.136.0.2:8080', '10.136.0.3:8080', '10.136.0.4:8080'])
+  // await uploadCluster(1000000, ['10.136.0.2:8080', '10.136.0.3:8080', '10.136.0.4:8080'])
+  await searchCluster(['10.136.0.2:8080', '10.136.0.3:8080', '10.136.0.4:8080'])
+
   const end = process.hrtime.bigint()
   const diffTime = end - start
   console.log(`Total run time: ${Number(diffTime) / 1000000}ms`)
