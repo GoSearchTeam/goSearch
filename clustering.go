@@ -113,7 +113,6 @@ func InitMyNode() {
 
 // isRelay is for if this message is being relayed by other nodes, we don't want to keep relaying it
 func addNodeToCluster(localCluster string, port int, name string, tcpAddr string, apiPort int) error {
-	fmt.Println("\n\nADDING NODE", name, apiPort)
 	if _, ok := AllNodes[name]; ok { // TODO: Suspect node stuff
 		log.Println("New node pretending to be old node, or I've seen this already, dropping add...")
 		return nil
@@ -198,6 +197,7 @@ func handleGossipMessage(gospMsg GossipMessage, c net.Conn) {
 			Name:         gospMsgData.Name,
 			Port:         gospMsgData.Port,
 			Interface:    gospMsgData.Interface,
+			APIPort:      gospMsgData.APIPort,
 		}
 		msgData, err := json.Marshal(data)
 		if err != nil {
