@@ -124,6 +124,7 @@ const main = async () => {
   const end = process.hrtime.bigint()
   const diffTime = end - start
   console.log(`Total run time: ${Number(diffTime) / 1000000}ms`)
+  console.log('Searched', y, 'items')
   console.log(`Average search time: ${(Number(diffTime) / 1000000) / y}ms`)
   // await fetch('https://maker.ifttt.com/trigger/code_done/with/key/kqsSaqYwkOQTkvFnP6yX11xKzfriGO_OAFG1cp0OlXW')
 }
