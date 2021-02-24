@@ -1,6 +1,7 @@
+import React from 'react';
 import { Badge } from 'react-bootstrap'
 
-const nodes = [
+const dummyNodes = [
     {
         LocalCluster: "Example Cluster",
         GlobalCluster: null,
@@ -16,25 +17,53 @@ const nodes = [
     }
 ]
 
-export default function Stats(props) {
-    return (
-        <>
-            <div className="body">
-                <header className="Section-header">Genaral Status</header>
-                <br></br>
-                Nodes Running <Badge variant="dark">{getNodes()}</Badge><br></br>
-                Documents on Disk <Badge variant="dark">{getDocs()}</Badge><br></br>
-                Indexes Currently Searchable <Badge variant="dark">{getIndexes()}</Badge><br></br>
-                <hr className="grey-hr"></hr>
-                <header className="Section-header">Node Status</header>
-                {getNodeStats()}
-            </div>
-        </>
-    );
+export class Stats extends React.Component {
+
+    constructor(props) {
+        super(props);
+
+        this.state = {
+            nodeCount: getNodes(),
+            docCount: getDocs(),
+            indexCount: getIndexes()
+        }
+    }
+
+    render() {
+        return (
+            <>
+                <div className="body">
+                    <header className="Section-header">General Status</header>
+                    <br></br>
+                    Nodes Running <Badge variant="dark">{this.state.nodeCount}</Badge><br></br>
+                    Documents on Disk <Badge variant="dark">{this.state.docCount}</Badge><br></br>
+                    Indexes Currently Searchable <Badge variant="dark">{this.state.indexCount}</Badge><br></br>
+                    <hr className="grey-hr"></hr>
+                    <header className="Section-header">Node Status</header>
+                    {getNodeStats()}
+                </div>
+            </>
+        );
+    }
+    
+    componentDidMount() {
+        this.interval = setInterval(() => {
+            this.setState({
+                nodeCount: getNodes(),
+                docCount: getDocs(),
+                indexCount: getIndexes()
+            })
+        }, 5e3);
+    }
+
+    componentWillUnmount() {
+        clearInterval(this.interval);
+    }
+
 }
 
 function getNodes() {
-    return nodes.length;
+    return dummyNodes.length;
 }
 
 function getDocs() {
@@ -45,9 +74,9 @@ function getIndexes() {
     return Math.floor(Math.random() * 30) + 1;
 }
 
-function getNodeStats(){
+function getNodeStats() {
     let nodeStats = [];
-    nodes.forEach(node => {
+    dummyNodes.forEach(node => {
         nodeStats.push(
             <div className="body">
                 <hr className="short-hr grey-hr"></hr>

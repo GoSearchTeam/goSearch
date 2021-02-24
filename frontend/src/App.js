@@ -4,7 +4,7 @@ import { BrowserRouter as Router, Switch, Route } from 'react-router-dom'
 import { Navbar, Nav } from 'react-bootstrap'
 import LoginPage from './pages/LoginPage.js'
 import Managment from './pages/Managment.js'
-import Stats from './pages/Stats.js'
+import { Stats } from './pages/Stats.js'
 
 function App() {
   return (
@@ -13,7 +13,7 @@ function App() {
         <Navbar bg="dark" variant="dark" expand="lg" className="nav-bar-round">
           <Navbar.Brand href="./managment">Go Search</Navbar.Brand>
           <Nav className="mr-auto">
-            <Nav.Link href="./managment">Managment</Nav.Link>
+            <Nav.Link href="./managment">Management</Nav.Link>
             <Nav.Link href="./stats">Status</Nav.Link>
           </Nav>
         </Navbar>
