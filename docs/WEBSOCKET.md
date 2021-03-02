@@ -21,3 +21,18 @@ Clients can send a stringified JSON message in the same format as the API `/inde
   ?beginsWith: String // Optional, must be provided if not using `query`, searches for documents with fields beginning with a string
 }
 ```
+
+This will emit back a stringified JSON object that is a list of documents:
+
+_(parsed)_
+```js
+{
+  [
+    {document},
+    {document},
+    {document},
+    {document},
+    ...
+  ]
+}
+```
