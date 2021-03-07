@@ -13,7 +13,7 @@ func TestAddIndex(t *testing.T) {
 	data, _ := parseArbJSON(`{
 		"index": "Test Add"
 	}`)
-	id := app.addIndex(data)
+	id := app.addIndex(data, false)
 
 	doc := fmt.Sprintf("./documents/%d", id)
 	if _, err := os.Stat(doc); os.IsNotExist(err) {
@@ -29,7 +29,7 @@ func TestDeleteIndex(t *testing.T) {
 		"index":"Test Delete"	
 	}`)
 
-	docID := app.addIndex(data)
+	docID := app.addIndex(data, false)
 	doc := fmt.Sprintf("./documents/%d", docID)
 	err := app.deleteIndex(docID)
 
@@ -47,12 +47,12 @@ func TestSmallSearch(t *testing.T) {
 	doc1Data, _ := parseArbJSON(`{
 		"indexSmallSearch": "value1"
 	}`)
-	doc1ID := app.addIndex(doc1Data)
+	doc1ID := app.addIndex(doc1Data, false)
 
 	doc2Data, _ := parseArbJSON(`{
 		"indexSmallSearch": "value2"
 	}`)
-	doc2ID := app.addIndex(doc2Data)
+	doc2ID := app.addIndex(doc2Data, false)
 
 	res1ID, res1Data := app.search("value1", []string{"indexSmallSearch"}, false)
 	res2ID, res2Data := app.search("value2", []string{"indexSmallSearch"}, false)
@@ -83,7 +83,7 @@ func TestUpdateIndex(t *testing.T) {
 		"index":"Test Update"
 	}`)
 
-	docID := app.addIndex(data)
+	docID := app.addIndex(data, false)
 
 	d := json.NewDecoder(strings.NewReader(fmt.Sprintf(`{
 		"docID":%v,
@@ -122,7 +122,7 @@ func TestFullCRUD(t *testing.T) {
 		"index":"Full CRUD"
 	}`)
 
-	docID := app.addIndex(data)
+	docID := app.addIndex(data, false)
 	doc := fmt.Sprintf("./documents/%d", docID)
 	if _, err := os.Stat(doc); os.IsNotExist(err) {
 		t.Error("Document not created")

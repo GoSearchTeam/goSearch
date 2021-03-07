@@ -2,7 +2,7 @@ package tree
 
 import (
 	"errors"
-	"fmt"
+	"log"
 	"reflect"
 )
 
