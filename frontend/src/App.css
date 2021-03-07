@@ -1,6 +1,15 @@
+:root{
+  --main-bg: #282c34;
+  --light-accent: grey;
+  --dark-accent: #1c1f25;
+}
+
 .App {
-  background-color: #282c34;
-  padding: 25px;
+  background-color: var(--main-bg);
+  padding-top: 2rem;
+  padding-left: 4rem;
+  padding-right: 4rem;
+  padding-bottom: 4rem;
   min-height: 100vh;
 }
 .App-header {
@@ -49,7 +58,7 @@
 }
 
 .grey-hr{
-  background-color: grey;
+  background-color: var(--light-accent);
 }
 
 .short-hr{
@@ -59,4 +68,44 @@
 
 .body {
   color: white;
+}
+
+.node-stats-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+.node-stats {
+  padding: 1rem;
+  background-color: var(--dark-accent);
+  border-radius: 1rem;
+}
+
+.general-stats{
+  font-size: 1.25rem;
+  background-color: var(--dark-accent);
+  border-radius: 1rem;
+  padding: .5rem;
+}
+
+.general-stats-gird {
+  display: flex;
+  gap: 1rem;
+}
+
+@media screen and (max-width: 800px) {
+  .general-stats-gird{
+    flex-direction: column;
+  }
+}
+
+.general-stats-badge{
+  
+}
+
+.stats-hr {
+  background-color: var(--light-accent);
+  margin-top: 0;
+  margin-bottom: 0;
 }
