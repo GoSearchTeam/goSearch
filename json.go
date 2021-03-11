@@ -43,14 +43,11 @@ func nestJSON(flattened map[string]interface{}) (map[string]interface{}, error) 
 	nested := make(map[string]interface{})
 	for key, value := range flattened {
 		if strings.Contains(key, "\\.") {
-			fmt.Println("Splitting up", key)
 			splitKeys := strings.Split(key, "\\.")
 			parentMap := &nested
-			fmt.Println("Parent map", parentMap)
 			for i := 0; i < len(splitKeys); i++ {
 				if i == len(splitKeys)-1 {
 					(*parentMap)[splitKeys[i]] = value
-					fmt.Println("0nested", nested)
 				} else {
 					if existing, found := (*parentMap)[splitKeys[i]]; found {
 						worked, _ := existing.(map[string]interface{})
@@ -60,7 +57,6 @@ func nestJSON(flattened map[string]interface{}) (map[string]interface{}, error) 
 					currentMap := make(map[string]interface{})
 					(*parentMap)[splitKeys[i]] = currentMap
 					parentMap = &currentMap
-					fmt.Println("1nested", nested)
 				}
 			}
 		} else {
