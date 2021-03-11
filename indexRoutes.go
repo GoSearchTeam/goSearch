@@ -40,6 +40,7 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 		flattened, _ := flattenJSON(jDat)
 		fmt.Println(flattened)
 		nested, _ := nestJSON(flattened)
+		nested["old"] = flattened
 		fmt.Println(nested)
 		c.JSON(200, nested)
 	})
