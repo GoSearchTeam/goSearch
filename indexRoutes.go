@@ -39,7 +39,9 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 		jDat, _ := parseArbJSON(string(data))
 		flattened, _ := flattenJSON(jDat)
 		fmt.Println(flattened)
-		c.JSON(200, jDat)
+		nested, _ := nestJSON(flattened)
+		fmt.Println(nested)
+		c.JSON(200, nested)
 	})
 
 	r.POST("/index/search", func(c *gin.Context) {
