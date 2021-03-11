@@ -3,9 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"io/ioutil"
 	"log"
+
+	"github.com/gin-gonic/gin"
 )
 
 type QueryBody struct {
@@ -31,6 +32,14 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 	r.GET("/index/listIndexes", func(c *gin.Context) {
 		list := app.listIndexes()
 		c.JSON(200, list)
+	})
+
+	r.POST("/flattenJSON", func(c *gin.Context) {
+		data, _ := ioutil.ReadAll(c.Request.Body)
+		jDat, _ := parseArbJSON(string(data))
+		flattened, _ := flattenJSON(jDat)
+		fmt.Println(flattened)
+		c.JSON(200, jDat)
 	})
 
 	r.POST("/index/search", func(c *gin.Context) {
