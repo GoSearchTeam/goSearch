@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -31,18 +32,10 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 
 	r.GET("/index/listIndexes", func(c *gin.Context) {
 		list := app.listIndexes()
+		for listItem, _ := range list {
+			list[listItem] = strings.ReplaceAll(list[listItem], "\\.", ".")
+		}
 		c.JSON(200, list)
-	})
-
-	r.POST("/flattenJSON", func(c *gin.Context) {
-		data, _ := ioutil.ReadAll(c.Request.Body)
-		jDat, _ := parseArbJSON(string(data))
-		flattened, _ := flattenJSON(jDat)
-		fmt.Println(flattened)
-		nested, _ := nestJSON(flattened)
-		nested["old"] = flattened
-		fmt.Println(nested)
-		c.JSON(200, nested)
 	})
 
 	r.POST("/index/search", func(c *gin.Context) {
@@ -64,13 +57,17 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 			res, responseJSON = app.search(query, make([]string, 0), bw)
 			output = append(output, res...)
 		}
+		for responseItem, _ := range responseJSON.Items {
+			responseJSON.Items[responseItem].Data, _ = nestJSON(responseJSON.Items[responseItem].Data)
+		}
 		c.JSON(200, responseJSON)
 	})
 
 	r.POST("/index/add", func(c *gin.Context) {
 		data, _ := ioutil.ReadAll(c.Request.Body)
 		jDat, _ := parseArbJSON(string(data))
-		docID := app.addIndex(jDat, false)
+		flatDat, _ := flattenJSON(jDat)
+		docID := app.addIndex(flatDat, false)
 		c.JSON(200, gin.H{
 			"msg":   "Added Index",
 			"docID": docID,
