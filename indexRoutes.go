@@ -3,9 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"io/ioutil"
 	"log"
+	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
 type QueryBody struct {
@@ -30,6 +32,9 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 
 	r.GET("/index/listIndexes", func(c *gin.Context) {
 		list := app.listIndexes()
+		for listItem, _ := range list {
+			list[listItem] = strings.ReplaceAll(list[listItem], "\\.", ".")
+		}
 		c.JSON(200, list)
 	})
 
@@ -52,13 +57,17 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 			res, responseJSON = app.search(query, make([]string, 0), bw)
 			output = append(output, res...)
 		}
+		for responseItem, _ := range responseJSON.Items {
+			responseJSON.Items[responseItem].Data, _ = nestJSON(responseJSON.Items[responseItem].Data)
+		}
 		c.JSON(200, responseJSON)
 	})
 
 	r.POST("/index/add", func(c *gin.Context) {
 		data, _ := ioutil.ReadAll(c.Request.Body)
 		jDat, _ := parseArbJSON(string(data))
-		docID := app.addIndex(jDat)
+		flatDat, _ := flattenJSON(jDat)
+		docID := app.addIndex(flatDat, false)
 		c.JSON(200, gin.H{
 			"msg":   "Added Index",
 			"docID": docID,
@@ -71,7 +80,7 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 		json.Unmarshal([]byte(data), &jDat)
 		docIDs := make([]uint64, 0)
 		for _, item := range jDat.Items {
-			docIDs = append(docIDs, app.addIndex(item))
+			docIDs = append(docIDs, app.addIndex(item, false))
 		}
 		c.JSON(200, gin.H{
 			"msg":    "Added Indexes",

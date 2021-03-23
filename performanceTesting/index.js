@@ -4,7 +4,7 @@ const fetch = require('isomorphic-fetch')
 const fs = require('fs')
 const nread = require('n-readlines')
 
-const uploadItem = async () => {
+const uploadItem = async (host) => {
   const userObj = {
     name: faker.name.findName(),
     email: faker.internet.email(),
@@ -17,7 +17,7 @@ const uploadItem = async () => {
     uid: nanoid()
   }
   const start = process.hrtime.bigint()
-  const resp = await fetch(`http://${process.env.HOSTNAME}:8080/index/add`, {
+  const resp = await fetch(`http://${host}/index/add`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json'
@@ -33,20 +33,32 @@ const uploadItem = async () => {
   return userObj
 }
 
-const uploadTest = async (rounds) => {
+const uploadCluster = async (rounds, hosts) => {
   for (let i = 0; i < rounds; i++) {
-    const item = await uploadItem()
-    // Store every 100 items
-    if (i % 100 === 0) {
+    const host = hosts[Math.floor(Math.random() * hosts.length)] // get random host
+    const item = await uploadItem(host)
+    // Store every 10 items
+    if (i % 10 === 0) {
       console.log(i)
       fs.appendFile('./randomItems.txt', `${JSON.stringify(item)}\n`, () => {})
     }
   }
 }
 
-const searchItem = async (itemField) => {
+const uploadTest = async (rounds) => {
+  for (let i = 0; i < rounds; i++) {
+    const item = await uploadItem()
+    // Store every 10 items
+    if (i % 10 === 0) {
+      console.log(i)
+      fs.appendFile('./randomItems.txt', `${JSON.stringify(item)}\n`, () => {})
+    }
+  }
+}
+
+const searchItem = async (itemField, host) => {
   const start = process.hrtime.bigint()
-  const resp = await fetch(`http://${process.env.HOSTNAME}:8080/index/search`, {
+  const resp = await fetch(`http://${host}/index/search`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json'
@@ -83,9 +95,38 @@ const searchTest = async () => {
   }
 }
 
+const searchCluster = async (hosts) => {
+  const items = []
+  const liner = new nread('./randomItems.txt')
+  let line
+  while (line = liner.next()) {
+    items.push(JSON.parse(line))
+  }
+  for (let k = 0; k < 5; k++) {
+    for (let i = 0; i < items.length; i++) {
+      // get random item field
+      console.log(items[i])
+      const theKey = randomProperty(items[i])
+      const host = hosts[Math.floor(Math.random() * hosts.length)] // get random host
+      await searchItem(items[i][theKey], host)
+    }
+  }
+  return items.length * 5
+}
+
 const main = async () => {
+  const start = process.hrtime.bigint()
   // await uploadTest(100000)
-  await searchTest()
+  // await searchTest()
+  // await uploadCluster(100, ['10.136.0.2:8080', '10.136.0.3:8080', '10.136.0.4:8080'])
+  const y = await searchCluster(['10.136.0.2:8080', '10.136.0.3:8080', '10.136.0.4:8080'])
+
+  const end = process.hrtime.bigint()
+  const diffTime = end - start
+  console.log(`Total run time: ${Number(diffTime) / 1000000}ms`)
+  console.log('Searched', y, 'items')
+  console.log(`Average search time: ${(Number(diffTime) / 1000000) / y}ms`)
+  // await fetch('https://maker.ifttt.com/trigger/code_done/with/key/kqsSaqYwkOQTkvFnP6yX11xKzfriGO_OAFG1cp0OlXW')
 }
 
 main()

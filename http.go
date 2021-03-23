@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	// "net/http"
@@ -14,5 +16,6 @@ func StartWebserver(app *appIndexes) {
 	HandleTestRoutes(r)
 	HandleIndexRoutes(r, app)
 	HandleWebsocketRoutes(r, app)
-	r.Run("localhost:8080")
+	HandleClusterRoutes(r)
+	r.Run(fmt.Sprintf("0.0.0.0:%d", *APIPort))
 }
