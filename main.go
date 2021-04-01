@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"io"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -62,8 +63,10 @@ func main() {
 		}
 	}()
 	<-c
-	log.Println("### Leaving Gossip")
-	LeaveGossipCluster()
+	if *FellowNodes != "" {
+		log.Println("### Leaving Gossip")
+		LeaveGossipCluster()
+	}
 	log.Println("### Serializing apps and indexes before exiting...")
 	for _, app := range Apps {
 		start := time.Now()
