@@ -1,6 +1,7 @@
 import React from 'react';
 import { Badge } from 'react-bootstrap'
 import NodeStats from '../components/NodeStats';
+import { ENDPOINTS } from '../config';
 
 const dummyNodes = [
     {
@@ -66,13 +67,13 @@ export class Stats extends React.Component {
         super(props);
 
         this.state = {
-            nodeCount: getNodes(),
-            docCount: getDocs(),
-            indexCount: getIndexes()
+            nodeCount: 0,
+            itemCount: 0,
+            indexCount: 0
         }
     }
 
-    render(props) {
+    render() {
         return (
             <>
                 <div className="body">
@@ -83,7 +84,7 @@ export class Stats extends React.Component {
                             Nodes Running <Badge variant="dark" className="general-stats-badge">{this.state.nodeCount}</Badge>
                         </div>
                         <div className="general-stats">
-                            Documents on Disk <Badge variant="dark" className="general-stats-badge">{this.state.docCount}</Badge>
+                            Items available <Badge variant="dark" className="general-stats-badge">{this.state.itemCount}</Badge>
                         </div>
                         <div className="general-stats">
                             Indexes Currently Searchable <Badge variant="dark" className="general-stats-badge">{this.state.indexCount}</Badge>
@@ -99,13 +100,19 @@ export class Stats extends React.Component {
         );
     }
     
-    componentDidMount() {
-        this.interval = setInterval(() => {
+    async componentDidMount() {
+        this.setState({
+            nodeCount: getNodes(),
+            itemCount: await getItems(),
+            indexCount: await getIndexes()
+        });
+
+        this.interval = setInterval(async() => {
             this.setState({
                 nodeCount: getNodes(),
-                docCount: getDocs(),
-                indexCount: getIndexes()
-            })
+                itemCount: await getItems(),
+                indexCount: await getIndexes()
+            });
         }, 5e3);
     }
 
@@ -119,10 +126,19 @@ function getNodes() {
     return dummyNodes.length;
 }
 
-function getDocs() {
-    return Math.floor(Math.random() * 1000000) + 100;
+async function getItems() {
+    return await fetch(ENDPOINTS.LIST_ITEMS)
+        .then(res => res.json())
+        .then(data => {
+            let count = 0;
+            if (data)
+                data.forEach(item => count += item.IndexValues.length)
+            return count;
+         });
 }
 
-function getIndexes() {
-    return Math.floor(Math.random() * 30) + 1;
+async function getIndexes() {
+    return await fetch(ENDPOINTS.LIST_IDXS)
+        .then(res => res.json())
+        .then(data => data?.length || 0);
 }
