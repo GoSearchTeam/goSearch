@@ -33,7 +33,7 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 	r.GET("/index/listIndexes", func(c *gin.Context) {
 		list := app.listIndexes()
 		for listItem, _ := range list {
-			list[listItem] = strings.ReplaceAll(list[listItem], "\\.", ".")
+			list[listItem].Name = strings.ReplaceAll(list[listItem].Name, "\\.", ".")
 		}
 		c.JSON(200, list)
 	})

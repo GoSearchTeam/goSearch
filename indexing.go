@@ -232,10 +232,19 @@ func convertNormalToOrderedMap(normMap *map[string]int) orderedmap.OrderedMap {
 // ######################## appIndexes functions ##########################
 // ########################################################################
 
-func (appIndex *appIndexes) listIndexes() []string {
-	var output []string
+func (appIndex *appIndexes) listIndexes() []struct {
+	TotalDocuments int
+	Name           string
+} {
+	var output []struct {
+		TotalDocuments int
+		Name           string
+	}
 	for _, i := range appIndex.Indexes {
-		output = append(output, i.Field)
+		output = append(output, struct {
+			TotalDocuments int
+			Name           string
+		}{TotalDocuments: i.TotalDocuments, Name: i.Field})
 	}
 	return output
 }
