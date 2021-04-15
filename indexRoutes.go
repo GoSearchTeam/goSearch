@@ -65,7 +65,13 @@ func HandleIndexRoutes(r *gin.Engine, app *appIndexes) {
 
 	r.POST("/index/add", func(c *gin.Context) {
 		data, _ := ioutil.ReadAll(c.Request.Body)
-		jDat, _ := parseArbJSON(string(data))
+		jDat, err := parseArbJSON(string(data))
+		if err != nil {
+			c.JSON(400, gin.H{
+				"msg": "Bad JSON",
+			})
+			return
+		}
 		flatDat, _ := flattenJSON(jDat)
 		docID := app.addIndex(flatDat, false)
 		c.JSON(200, gin.H{
