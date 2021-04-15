@@ -3,71 +3,13 @@ import { Badge } from 'react-bootstrap'
 import NodeStats from '../components/NodeStats';
 import { ENDPOINTS } from '../config';
 
-const dummyNodes = [
-    {
-        LocalCluster: "Example Cluster",
-        GlobalCluster: "AWS1",
-        IP: "192.168.1.1",
-        Port: 4444,
-        Name: "Example Node 1"
-    }, {
-        LocalCluster: "Example Cluster",
-        GlobalCluster: "AWS1",
-        IP: "255.255.255.255",
-        Port: 5555,
-        Name: "Example Node 2"
-    }, {
-        LocalCluster: "Example Cluster",
-        GlobalCluster: "AWS1",
-        IP: "255.255.255.255",
-        Port: 5555,
-        Name: "Example Node 3"
-    }, {
-        LocalCluster: "Example Cluster",
-        GlobalCluster: "AWS1",
-        IP: "255.255.255.255",
-        Port: 5555,
-        Name: "Example Node 4"
-    }, {
-        LocalCluster: "Example Cluster",
-        GlobalCluster: "AWS1",
-        IP: "255.255.255.255",
-        Port: 5555,
-        Name: "Example Node 5"
-    }, {
-        LocalCluster: "Example Cluster",
-        GlobalCluster: "AWS1",
-        IP: "255.255.255.255",
-        Port: 5555,
-        Name: "Example Node 6"
-    }, {
-        LocalCluster: "Example Cluster",
-        GlobalCluster: "AWS1",
-        IP: "255.255.255.255",
-        Port: 5555,
-        Name: "Example Node 7"
-    }, {
-        LocalCluster: "Example Cluster",
-        GlobalCluster: "AWS1",
-        IP: "255.255.255.255",
-        Port: 5555,
-        Name: "Example Node 8"
-    }, {
-        LocalCluster: "Example Cluster",
-        GlobalCluster: "AWS1",
-        IP: "255.255.255.255",
-        Port: 5555,
-        Name: "Example Node 9"
-    }
-]
-
 export class Stats extends React.Component {
 
     constructor(props) {
         super(props);
 
         this.state = {
-            nodeCount: 0,
+            nodes: [],
             itemCount: 0,
             indexCount: 0
         }
@@ -81,7 +23,7 @@ export class Stats extends React.Component {
                     <br></br>
                     <div className="general-stats-gird">
                         <div className="general-stats">
-                            Nodes Running <Badge variant="dark" className="general-stats-badge">{this.state.nodeCount}</Badge>
+                            Nodes Running <Badge variant="dark" className="general-stats-badge">{this.state.nodes.length}</Badge>
                         </div>
                         <div className="general-stats">
                             Items available <Badge variant="dark" className="general-stats-badge">{this.state.itemCount}</Badge>
@@ -93,7 +35,7 @@ export class Stats extends React.Component {
                     <hr className="grey-hr"></hr>
                     <header className="Section-header">Node Status</header>
                     <div className="node-stats-grid">
-                        {dummyNodes.map(node => <NodeStats node = {node}/>)}
+                        {this.state.nodes.map(node => <NodeStats node = {node}/>)}
                     </div>
                 </div>
             </>
@@ -102,14 +44,14 @@ export class Stats extends React.Component {
     
     async componentDidMount() {
         this.setState({
-            nodeCount: getNodes(),
+            nodes: await getNodes(),
             itemCount: await getItems(),
             indexCount: await getIndexes()
         });
 
         this.interval = setInterval(async() => {
             this.setState({
-                nodeCount: getNodes(),
+                nodes: await getNodes(),
                 itemCount: await getItems(),
                 indexCount: await getIndexes()
             });
@@ -122,19 +64,21 @@ export class Stats extends React.Component {
 
 }
 
-function getNodes() {
-    return dummyNodes.length;
+async function getNodes() {
+    return await fetch(ENDPOINTS.NODES)
+        .then(res => res.json())
 }
 
 async function getItems() {
-    return await fetch(ENDPOINTS.LIST_ITEMS)
-        .then(res => res.json())
-        .then(data => {
-            let count = 0;
-            if (data)
-                data.forEach(item => count += item.IndexValues.length)
-            return count;
-         });
+    // return await fetch(ENDPOINTS.LIST_ITEMS)
+    //     .then(res => res.json())
+    //     .then(data => {
+    //         let count = 0;
+    //         if (data)
+    //             data.forEach(item => count += item.IndexValues.length)
+    //         return count;
+    //      });
+    return 1;
 }
 
 async function getIndexes() {

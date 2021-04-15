@@ -11,10 +11,11 @@ class NodeStats extends React.Component {
                     {node.Name}
                 </h5>
                 <hr className="stats-hr"></hr>
-                Local Cluster: <Badge variant="dark">{node.LocalCluster}</Badge><br></br>
-                Global Cluster: <Badge variant="dark">{node.GlobalCluster}</Badge><br></br>
-                IP: <Badge variant="dark">{node.IP}</Badge><br></br>
+                Local Cluster: <Badge variant="dark">{node.LocalCluster || 'none'}</Badge><br></br>
+                Global Cluster: <Badge variant="dark">{node.GlobalCluster || 'none'}</Badge><br></br>
+                IP: <Badge variant="dark">{node.IP || 'unknown'}</Badge><br></br>
                 Port: <Badge variant="dark">{node.Port}</Badge><br></br>
+                API Port: <Badge variant="dark">{node.APIPort}</Badge><br></br>
             </div>
         );
     }

@@ -109,3 +109,14 @@
   margin-top: 0;
   margin-bottom: 0;
 }
+
+.search-error {
+  margin-top: 0.5rem;
+}
+
+.form-control {
+  color: #cccccc !important;
+}
+.form-control:focus {
+  color: #ffffff !important;
+}
