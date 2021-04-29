@@ -5,6 +5,6 @@ export const ENDPOINTS = {
     LIST_IDXS: 'http://localhost:8000/index/listIndexes',
     LIST_ITEMS: 'http://localhost:8000/index/listItems',
     SEARCH: 'http://localhost:8000/index/search',
-    UPDATE: 'http://localhost:8000/index/addMultiple',
+    UPDATE: 'http://localhost:8000/index/update',
     NODES: 'http://localhost:8000/cluster/nodes'
 }

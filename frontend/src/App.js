@@ -3,7 +3,7 @@ import 'bootstrap/dist/css/bootstrap.min.css'
 import { BrowserRouter as Router, Switch, Route } from 'react-router-dom'
 import { Navbar, Nav } from 'react-bootstrap'
 import LoginPage from './pages/LoginPage.js'
-import Management from './pages/Managment.js'
+import { Management } from './pages/Managment.js'
 import { Stats } from './pages/Stats.js'
 
 function App() {
