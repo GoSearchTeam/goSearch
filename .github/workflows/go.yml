@@ -9,6 +9,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
 
+    - name: Install Node v12
+      uses: actions/setup-node@v1
+      with:
+        node-version: 12
+
     - name: Set up Go 1.x
       uses: actions/setup-go@v2
       with:
